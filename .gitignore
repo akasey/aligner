@@ -1,3 +1,10 @@
+#Project specific
+# temp files for experiments
+run/**
+# tensorboard log dir
+model/**
+
+#Tensorflow
 .DS_Store
 .ipynb_checkpoints
 node_modules
