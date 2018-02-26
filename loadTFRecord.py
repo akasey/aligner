@@ -39,7 +39,7 @@ def reshaping(feature, label):
     f,l = feature, label
     f,l = tf.reshape(f, [meta['feature_dense_shape'][0]]), tf.reshape(l, [meta['label_dense_shape'][0]])
 
-    f, l = tf.cast(f, dtype=tf.float32), tf.cast(l, dtype=tf.float32)
+    f, l = tf.cast(f, dtype=tf.float32), tf.cast(l, dtype=tf.int64)
     print("reshaping_2", f, l)
     return f, l
 
