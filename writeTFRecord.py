@@ -5,8 +5,10 @@ import numpy as np
 import math
 import json
 
-SEGMENTS_LEN = 10000
-WINDOW_LEN = 1000
+
+workDir = "Carsonella_ruddii/"
+SEGMENTS_LEN = 500
+WINDOW_LEN = 100
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
 
 def readGenome(fasta):
@@ -83,11 +85,12 @@ def writeTFRecord(df, filename):
             writer.write(example.SerializeToString())
 
 def writeMeta(meta):
-    np.save("run/meta.npy", meta)
+    np.save(workDir+"meta.npy", meta)
+    print(meta)
 
 
 
-genome = readGenome("run/sequence.fasta")
+genome = readGenome(workDir+"sequence.fasta")
 numSegments, segments = getSegments(genome, SEGMENTS_LEN) #numSegments is needed for output layer
 allWindows = {}
 for segment in segments:
@@ -121,17 +124,17 @@ for key,values in allWindows.items():
     counter += 1
     if counter %10000 == 0:
         print(str(counter) + " encoded out of " + str(len(allWindows)))
-    if counter == 10000:
-        break
+    # if counter == 100000:
+    #     break
 
 print("Test train split.....")
 train, test = train_test_split(df, test_size=0.30)
 # print(train.head(10))
 # print(test.head(10))
 print("Writing train to file...")
-writeTFRecord(train, "run/train.tfrecords")
+writeTFRecord(train, workDir+"train.tfrecords")
 print("Writing test to file...")
-writeTFRecord(test, "run/test.tfrecords")
+writeTFRecord(test, workDir+"test.tfrecords")
 writeMeta(meta)
 exit(0)
 

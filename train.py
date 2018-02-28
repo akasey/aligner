@@ -1,12 +1,13 @@
 import tensorflow as tf
-from loadTFRecord import loadDataset, loadMeta
+from loadTFRecord import Loader
 import numpy as np
 import math
+import sys
 
 class Model:
     def __init__(self, input, label, batch_size):
         self.model_save_dir = 'model/'
-        self.model_save_name = 'saved.ckpt'
+        self.model_save_name = 'softmax-saved.ckpt'
 
         self.input_shape = input.shape
         self.label_shape = label.shape
@@ -17,42 +18,38 @@ class Model:
         self.logits = self._inference(input)
         self.loss = self._loss(self.logits, label)
         self.train_op = self._train(self.loss)
-        self.evaluation, self.evaluate_op = self._evaluate(self.logits, label)
+        self.evaluation, self.evaluation_summary, self.evaluate_op = self._evaluate(self.logits, label)
 
-        self.model_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        self.saver = tf.train.Saver(self.model_params, max_to_keep=4, keep_checkpoint_every_n_hours=2)
+        self.saver = tf.train.Saver(self.model_params, max_to_keep=2)
 
     def _inference(self, inputs):
         with tf.name_scope('fcc' ):
-            d1 = self._make_dense(inputs, units=1500, activation=tf.nn.relu, name="layer_1")
-            d1 = self._make_dense(d1, units=1000, activation=tf.nn.relu, name="layer_2")
-            logits = self._make_dense(d1, units=self.label_shape[1], activation=None, name="layer_out")
+            d1 = self._make_dense(inputs, units=350, activation_fn=tf.nn.relu, name="layer_1")
+            d1 = self._make_dense(d1, units=150, activation_fn=tf.nn.relu, name="layer_2")
+            d1 = self._make_dense(d1, units=50, activation_fn=tf.nn.relu, name="layer_3")
+            logits = self._make_dense(d1, units=self.label_shape[1].value, activation_fn=None, name="layer_out")
             return logits
 
-    def _make_dense(self, ip_tensor, units, activation, name):
-        d1 = tf.layers.dense(inputs=ip_tensor, units=units, kernel_initializer=tf.truncated_normal_initializer, activation=activation, name=name)
-        d1_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, name)
-        tf.summary.histogram('kernel', d1_vars[0])
-        tf.summary.histogram('bias', d1_vars[1])
-        tf.summary.histogram('act', d1)
-        # self.model_params.append(d1.)
-        # self.model_params.append(d1.bias)
-        return d1
+    def _make_dense(self, ip_tensor, units, activation_fn, name):
+        shape = [ip_tensor.shape[1].value, units]
+        weights = self.get_weights(shape, name)
+        biases = self.get_biases(shape, name)
+        activation = tf.matmul(ip_tensor, weights) + biases
+        if activation_fn:
+            activation = activation_fn(activation)
+        tf.summary.histogram(name + "_weights", weights)
+        tf.summary.histogram(name + "_biases", biases)
+        tf.summary.histogram(name + "_act", activation)
+        self.model_params.append(weights)
+        self.model_params.append(biases)
+        return activation
 
     def _loss(self, logits, labels):
         with tf.name_scope('loss'):
-            # softmax = tf.nn.softmax(logits)
-            # num_ones = tf.cast(tf.count_nonzero(labels, axis=1), dtype=tf.int32)
-            # top_k_values, top_k_indices = tf.nn.top_k(softmax, num_ones)
-            # print(top_k_values, top_k_indices)
             cast_labels = tf.cast(labels, dtype=tf.float32)
-            loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=cast_labels))
-            # loss = tf.reduce_mean(top_k_values)
+            # loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=cast_labels))
+            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=cast_labels))
             tf.summary.scalar('loss', loss)
-            # loss = tf.reduce_mean(tf.squared_difference(labels, logits))
-            # loss = tf.cast(loss, dtype=tf.float32)
-            # loss = tf.Print(loss, [loss], "loss =")
-            # loss = tf.losses.softmax_cross_entropy(labels, logits=logits)
             return loss
 
     def _train(self, loss):
@@ -63,17 +60,9 @@ class Model:
 
     def _evaluate(self, logits, labels):
         with tf.name_scope('evaluate'):
-            precision, precision_op = tf.metrics.average_precision_at_k(labels, logits, k=2)
-            # tf.summary.scalar('precision@2', precision)
-            return precision, precision_op
-
-            # softmax = tf.nn.softmax(logits)
-            # # values_pred, indices_pred = tf.nn.top_k(softmax)
-            # correct_prediction = tf.reduce_sum(softmax)
-            # accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            # return accuracy
-            # num_ones = tf.count_nonzero(labels)
-            # top_k_values, top_k_indices = tf.nn.top_k(softmax, num_ones)
+            precision, precision_op = tf.metrics.average_precision_at_k(labels, logits, k=1)
+            summary_op = tf.summary.scalar('precision@2', precision)
+            return precision, summary_op, precision_op
 
 
     def save(self, sess):
@@ -83,52 +72,88 @@ class Model:
         path = tf.train.latest_checkpoint(self.model_save_dir)
         self.saver.restore(sess, path)
 
+    def get_weights(self, shape, name):
+        fan_in = np.prod(shape[0:-1])
+        std = 1 / math.sqrt(fan_in)
+        return tf.Variable(tf.random_uniform(shape, minval=(-std), maxval=std), name=(name + "_weights"))
 
-def main():
-    batch_size = 100
-    meta = loadMeta("run/meta.npy")
-    print(meta)
+    def get_biases(self, shape, name):
+        fan_in = np.prod(shape[0:-1])
+        std = 1 / math.sqrt(fan_in)
+        return tf.Variable(tf.random_uniform([shape[-1]], minval=(-std), maxval=std), name=(name + "_biases"))
+
+
+def main(args):
+    dataDir = args[1]
+    batch_size = 512
+    loader = Loader(dataDir, batch_size=batch_size)
+    print(loader.meta)
     restore = False
     with tf.Graph().as_default():
-        X, Y = loadDataset("run/train.tfrecords", batch_size)
-        X_test, Y_test = loadDataset("run/test.tfrecords", batch_size, repeat=False)
+        X, Y = loader.loadDataset("train")
+        X_test, Y_test = loader.loadDataset("test")
 
-        features = tf.placeholder(tf.float32, name="features", shape=[None, meta['feature_dense_shape'][0]])
-        labels = tf.placeholder(tf.int64, name="labels", shape=[None, meta['label_dense_shape'][0]])
+        features = tf.placeholder(tf.float32, name="features", shape=loader.getInputShape())
+        labels = tf.placeholder(tf.int64, name="labels", shape=loader.getOutputShape())
         model = Model(features,labels, batch_size)
 
-        with tf.Session() as sess:
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+        with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
             if not restore:
+                print("Initializing network....")
                 global_init = tf.global_variables_initializer()
                 local_init = tf.local_variables_initializer()
                 sess.run([global_init, local_init])
             else:
+                print("Restoring network....")
                 model.restore(sess)
+                local_init = tf.local_variables_initializer()
+                sess.run([local_init])
 
             merged = tf.summary.merge_all()
-            writer = tf.summary.FileWriter("model/what/")
+            writer = tf.summary.FileWriter("model/softmax/")
             writer.add_graph(sess.graph)
 
-            for step in range(1000):
-                _x,_y = sess.run([X,Y])
-                summary, lossVal, _ = sess.run([merged, model.loss, model.train_op], feed_dict={features: _x, labels: _y})
-                if step%100 == 0:
+            for step in range(10000):
+                if not restore:
+                    _x,_y = sess.run([X,Y])
+                    summary, lossVal, _ = sess.run([merged, model.loss, model.train_op], feed_dict={features: _x, labels: _y})
                     writer.add_summary(summary, step)
-                    print("Batch Loss at step:", step, lossVal)
-                if step%1000 == 0:
-                    model.save(sess)
+                    if step%100 == 0:
+                        print("Batch Loss at step:", step, lossVal)
+                        model.save(sess)
 
-            while True:
-                try:
-                    _x_test, _y_test = sess.run([X_test, Y_test])
-                    sess.run([model.evaluate_op, model.logits], feed_dict={features: _x_test, labels: _y_test})
-                    # accuracy.append(testLoss)
-                except tf.errors.OutOfRangeError:
-                    break
+                accuracy_profile = []
+                if (step+1) %200 == 0:
+                    sess.run([local_init])
+                    print("Evaluating accuracy.....")
+                    while True:
+                        try:
+                            _x_test, _y_test = sess.run([X_test, Y_test])
+                            _, act_out = sess.run([model.evaluate_op, model.logits],
+                                                  feed_dict={features: _x_test, labels: _y_test})
 
-            print(".....................Test Accuracy", sess.run([model.evaluation]))
+                            # precision monitor
+                            k = 1
+                            for true_label, pred_label in zip(_y_test, act_out):
+                                true_label, pred_label = np.array(true_label), np.array(pred_label)
+                                true_label_idx, pred_label_idx = true_label.argsort()[-k:][::-1],pred_label.argsort()[-k:][::-1]
+                                accuracy_profile.append((true_label_idx, pred_label_idx))
+
+                        except tf.errors.OutOfRangeError:
+                            X_test, Y_test = loader.loadDataset("test")
+                            break
+
+                    with open(dataDir+"/temp/true-softmax","w") as trf, open(dataDir+"/temp/predict-softmax","w") as prf:
+                        for tr,pr in accuracy_profile:
+                            trf.write(str(tr) + "\n")
+                            prf.write(str(pr) + "\n")
+
+                    precision, eval_summary =  sess.run([model.evaluation, model.evaluation_summary])
+                    print(".....................Test Precision",precision)
+                    writer.add_summary(eval_summary, step)
 
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
