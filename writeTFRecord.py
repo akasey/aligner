@@ -1,15 +1,26 @@
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
-import pandas as pd
 import numpy as np
 import math
-import json
+import copy
 
 
-workDir = "Carsonella_ruddii/"
-SEGMENTS_LEN = 500
-WINDOW_LEN = 100
+workDir = "run/"
+SEGMENTS_LEN = 10000
+WINDOW_LEN = 1000
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
+
+kmerEncoding = {}
+def encodeKmer(kmer):
+    if kmer in kmerEncoding:
+        return kmerEncoding[kmer]
+
+    numeric = 0
+    for idx, nt in enumerate(kmer):
+        numeric += nucMap[nt] * 4**idx
+    kmerEncoding[kmer] = numeric
+    return numeric
+
 
 def readGenome(fasta):
     lines = ""
@@ -19,13 +30,13 @@ def readGenome(fasta):
                 lines += line.strip()
     return lines
 
-def getSegments(genome, segmentLength):
+def getSegments(genome, segmentLength, windowLen):
     genomeLength = len(genome)
     numSegments = math.ceil(float(genomeLength)/float(segmentLength))
     segments = []
     for i in range(numSegments):
-        start = i*SEGMENTS_LEN
-        end = min(start + SEGMENTS_LEN, genomeLength)
+        start = max(0, i*SEGMENTS_LEN - windowLen)
+        end = min(start + SEGMENTS_LEN + 2*windowLen, genomeLength)
         segment = genome[start:end]
         segments.append((i, segment))
     return numSegments, segments
@@ -47,10 +58,22 @@ def stringifyFeature(feature):
     charArr = [nucMap[x] for x in list(feature)]
     return np.asarray(charArr)
 
-def encodeOneHot(window):
-    charArr = [nucMap[x] for x in list(window)]
-    b = np.zeros((len(charArr), 4))
-    b[np.arange(len(charArr)), charArr] = 1
+def encodeKmerBagOfWords(window, last_window, last_encoded_window):
+    k = 8
+
+    # incremental -- Not sure if dictionary order is preserved
+    if last_window is not None and last_encoded_window is not None:
+        last_start_kmer = last_window[0:0+k]
+        last_encoded_window[encodeKmer(last_start_kmer)] -= 1
+        this_end_kmer = window[-k:]
+        last_encoded_window[encodeKmer(this_end_kmer)] += 1
+        return last_encoded_window
+
+    # sliding kmer extraction
+    b = np.zeros(4**k)
+    for i in range(len(window) - k +1 ):
+        kmer_num = encodeKmer( window[i:i+k] )
+        b[kmer_num] = 1
     return b.flatten()
 
 def encodeLabels(segIds, numSegments):
@@ -89,9 +112,8 @@ def writeMeta(meta):
     print(meta)
 
 
-
 genome = readGenome(workDir+"sequence.fasta")
-numSegments, segments = getSegments(genome, SEGMENTS_LEN) #numSegments is needed for output layer
+numSegments, segments = getSegments(genome, SEGMENTS_LEN, WINDOW_LEN) #numSegments is needed for output layer
 allWindows = {}
 for segment in segments:
     segId = segment[0]
@@ -108,8 +130,11 @@ print("Starting to encode...")
 counter = 0
 df = []
 meta = {}
+last_window, last_encoded_window = None, None
 for key,values in allWindows.items():
-    features = encodeOneHot(key)
+    features = encodeKmerBagOfWords(key, last_window, last_encoded_window)
+    last_window, last_encoded_window = key, copy.deepcopy(features)
+
     features_indices, features_values, features_dense_shape = sparseRepresentation(features)
     # print(features_indices, features_values, features_dense_shape)
     label_indices, label_values, label_dense_shape = encodeLabels(values, numSegments)
@@ -148,6 +173,6 @@ s = tf.reshape(s, [1, -1])
 sess = tf.Session()
 op = sess.run(s)
 print(op)
-print(encodeOneHot(a))
-print(sparseRepresentation(encodeOneHot(a)))
-print("sum", np.sum(np.array(op) - encodeOneHot(a)))
+print(encodeKmerBagOfWords(a))
+print(sparseRepresentation(encodeKmerBagOfWords(a)))
+print("sum", np.sum(np.array(op) - encodeKmerBagOfWords(a)))
