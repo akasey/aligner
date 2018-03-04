@@ -5,9 +5,10 @@ import math
 import copy
 
 
+# workDir = "Carsonella_ruddii/"
 workDir = "run/"
-SEGMENTS_LEN = 10000
-WINDOW_LEN = 1000
+SEGMENTS_LEN = 1000
+WINDOW_LEN = 100
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
 
 kmerEncoding = {}
@@ -62,7 +63,7 @@ def encodeKmerBagOfWords(window, last_window, last_encoded_window):
     k = 8
 
     # incremental -- Not sure if dictionary order is preserved
-    if last_window is not None and last_encoded_window is not None:
+    if last_window is not None and last_encoded_window is not None and last_window[1:] == window[0:-1]:
         last_start_kmer = last_window[0:0+k]
         last_encoded_window[encodeKmer(last_start_kmer)] -= 1
         this_end_kmer = window[-k:]
