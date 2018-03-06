@@ -6,6 +6,14 @@ import numpy as np
 import sys
 from common import *
 
+
+def evaluate_f1(labels, pred):
+    intersection = np.sum(labels[pred==True])
+    labels_count = np.sum(labels)
+    pred_count = np.sum(pred)
+    return 2*intersection/(labels_count + pred_count + 0.0)
+
+
 def main(args):
     if len(args) != 3:
         print("Usage: ", "<data_dir> <model_saved_dir>")
