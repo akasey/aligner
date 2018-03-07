@@ -7,7 +7,7 @@ import sys
 from common import *
 
 
-def evaluate_f1(labels, pred):
+def evaluate_f1_deprecated(labels, pred):
     intersection = np.sum(labels[pred==True])
     labels_count = np.sum(labels)
     pred_count = np.sum(pred)
@@ -25,6 +25,12 @@ def recall(labels, pred):
     labels_count = np.sum(labels)
     # pred_count = np.sum(pred)
     return intersection / (labels_count + 0.0)
+
+def evaluate_f1(labels, pred):
+    prec = precision(labels, pred)
+    rec = recall(labels, pred)
+    return 2*pred*rec/(pred + rec + 0.0)
+
 
 def main(args):
     if len(args) != 3:
