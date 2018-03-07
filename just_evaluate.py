@@ -14,6 +14,18 @@ def evaluate_f1(labels, pred):
     return 2*intersection/(labels_count + pred_count + 0.0)
 
 
+def precision(labels, pred):
+    intersection = np.sum(labels[pred==True])
+    # labels_count = np.sum(labels)
+    pred_count = np.sum(pred)
+    return intersection / (pred_count + 0.0)
+
+def recall(labels, pred):
+    intersection = np.sum(labels[pred==True])
+    labels_count = np.sum(labels)
+    # pred_count = np.sum(pred)
+    return intersection / (labels_count + 0.0)
+
 def main(args):
     if len(args) != 3:
         print("Usage: ", "<data_dir> <model_saved_dir>")
