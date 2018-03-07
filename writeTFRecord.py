@@ -5,11 +5,12 @@ import math
 import copy
 
 
-# workDir = "Carsonella_ruddii/"
+# workDir = "vvsmall/"
 workDir = "run/"
-SEGMENTS_LEN = 1000
-WINDOW_LEN = 100
+SEGMENTS_LEN = 7000
+WINDOW_LEN = 1000
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
+k=8
 
 kmerEncoding = {}
 def encodeKmer(kmer):
@@ -36,8 +37,8 @@ def getSegments(genome, segmentLength, windowLen):
     numSegments = math.ceil(float(genomeLength)/float(segmentLength))
     segments = []
     for i in range(numSegments):
-        start = max(0, i*SEGMENTS_LEN - windowLen)
-        end = min(start + SEGMENTS_LEN + 2*windowLen, genomeLength)
+        start = max(0, i*SEGMENTS_LEN - math.floor(windowLen/2.0))
+        end = min((i+1)*SEGMENTS_LEN + math.ceil(windowLen/2.0)-1, genomeLength)
         segment = genome[start:end]
         segments.append((i, segment))
     return numSegments, segments
@@ -60,11 +61,10 @@ def stringifyFeature(feature):
     return np.asarray(charArr)
 
 def encodeKmerBagOfWords(window, last_window, last_encoded_window):
-    k = 8
-
     # incremental -- Not sure if dictionary order is preserved
     if last_window is not None and last_encoded_window is not None and last_window[1:] == window[0:-1]:
         last_start_kmer = last_window[0:0+k]
+        # last_encoded_window[encodeKmer(last_start_kmer)] = max(0, last_encoded_window[encodeKmer(last_start_kmer)]-1)
         last_encoded_window[encodeKmer(last_start_kmer)] -= 1
         this_end_kmer = window[-k:]
         last_encoded_window[encodeKmer(this_end_kmer)] += 1
@@ -74,7 +74,7 @@ def encodeKmerBagOfWords(window, last_window, last_encoded_window):
     b = np.zeros(4**k)
     for i in range(len(window) - k +1 ):
         kmer_num = encodeKmer( window[i:i+k] )
-        b[kmer_num] = 1
+        b[kmer_num] += 1
     return b.flatten()
 
 def encodeLabels(segIds, numSegments):
@@ -135,6 +135,9 @@ last_window, last_encoded_window = None, None
 for key,values in allWindows.items():
     features = encodeKmerBagOfWords(key, last_window, last_encoded_window)
     last_window, last_encoded_window = key, copy.deepcopy(features)
+    # print(features)
+    # plt.plot(features)
+    # plt.show()
 
     features_indices, features_values, features_dense_shape = sparseRepresentation(features)
     # print(features_indices, features_values, features_dense_shape)
@@ -150,8 +153,9 @@ for key,values in allWindows.items():
     counter += 1
     if counter %10000 == 0:
         print(str(counter) + " encoded out of " + str(len(allWindows)))
-    # if counter == 100000:
+    # if counter == 10:
     #     break
+
 
 print("Test train split.....")
 train, test = train_test_split(df, test_size=0.30)

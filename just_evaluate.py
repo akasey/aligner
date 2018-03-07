@@ -54,8 +54,8 @@ def main(args):
         print(layer_out)
 
         examplesCount = 0
-        precision = 0
-        recall = 0
+        precision_total = 0
+        recall_total = 0
         while True:
             try:
                 _x_test, _y_test = sess.run([X_test, Y_test])
@@ -64,14 +64,15 @@ def main(args):
                 # precision monitor
                 # k = 2
                 for true_label, pred_label in zip(_y_test, activations[0]):
-                    true_label, pred_label = np.array(true_label), np.array(pred_label)
-                    # true_label_idx, pred_label_idx = true_label.argsort()[-k:][::-1], pred_label.argsort()[-k:][::-1]
-                    # print("True Label", true_label, "Pred Logits", pred_label)
-                    print("True Label", true_label, "Pred Label", sigmoid(pred_label))
+                    true_label, pred_label = np.array(true_label), sigmoid(np.array(pred_label))
+                    precision_total += precision(true_label, pred_label)
+                    recall_total += recall(true_label, pred_label)
+                    print("True Label", true_label, "Pred Label", pred_label, "Precision", precision(true_label, pred_label), "Recall", recall(true_label, pred_label))
                     examplesCount += 1
 
             except tf.errors.OutOfRangeError:
                 break
+        print("Precision: ", precision_total/examplesCount, "Recall: ", recall_total/examplesCount)
 
 
 

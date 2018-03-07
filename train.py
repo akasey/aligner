@@ -31,7 +31,7 @@ def main(args):
     restore = False
     with tf.Graph().as_default():
         X, Y = loader.loadDataset("train")
-        X_test, Y_test = loader.loadDataset("test")
+        # X_test, Y_test = loader.loadDataset("test")
 
         features = tf.placeholder(tf.float32, name="features", shape=loader.getInputShape())
         labels = tf.placeholder(tf.int64, name="labels", shape=loader.getOutputShape())
@@ -66,7 +66,7 @@ def main(args):
                                                    options=options, run_metadata=run_metadata)
                     writer.add_summary(summary, step)
                     print("Batch Loss at step:", step, lossVal)
-                    if step % 100 == 0:
+                    if step % 1000 == 0:
                         model.save(sess)
                     # if (step+1) % 10 == 0:
                     #     fetched_timeline = timeline.Timeline(run_metadata.step_stats)
@@ -74,6 +74,7 @@ def main(args):
                     #     with open('timeline_nosummaries' + str(step) + '.json', 'w') as f:
                     #         f.write(chrome_trace)
 
+"""
                 accuracy_profile = []
                 if (step+1) %200 == 0:
                     sess.run([local_init])
@@ -103,7 +104,7 @@ def main(args):
                     precision, eval_summary =  sess.run([model.evaluation, model.evaluation_summary])
                     print(".....................Test Precision",precision)
                     writer.add_summary(eval_summary, step)
-
+"""
 
 
 if __name__ == "__main__":

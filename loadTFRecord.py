@@ -32,7 +32,7 @@ class Loader:
             features=example_features)
         feature, label = rows['feature'], rows['label']
         feature, label = tf.reshape(tf.sparse_tensor_to_dense(feature), [self.meta['feature_dense_shape'][0]]), tf.reshape(tf.sparse_tensor_to_dense(label), [self.meta['label_dense_shape'][0]])
-        feature, label = tf.cast(feature, dtype=tf.float32), tf.cast(label, dtype=tf.int64)
+        feature, label = tf.cast(feature, dtype=tf.float32), tf.cast(label, dtype=tf.int8)
 
         return feature, label
 
@@ -43,7 +43,7 @@ class Loader:
             if repeat:
                 dataset = dataset.repeat()
             dataset = dataset.map(map_func=self.__serializedToRows, num_parallel_calls=20) \
-                        .batch(batch_size)
+                        .batch(batch_size)\
                         # .shuffle(1024)\
 
             return dataset
