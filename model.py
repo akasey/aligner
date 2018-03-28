@@ -58,13 +58,13 @@ class Model:
         return activation
 
     def _loss(self, logits, labels):
-        with tf.device(self.devicePrior):
-            with tf.name_scope('loss'):
+        with tf.name_scope('loss'):
+            with tf.device(self.devicePrior):
                 cast_labels = tf.cast(labels, dtype=tf.float32)
                 loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=cast_labels))
                 # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=cast_labels))
-                tf.summary.scalar('loss', loss)
-                return loss
+            tf.summary.scalar('loss', loss)
+            return loss
 
     def _train(self, loss):
         with tf.device(self.devicePrior):

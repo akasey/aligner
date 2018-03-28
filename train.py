@@ -7,6 +7,15 @@ from tensorflow.python.client import device_lib, timeline
 from model import Model
 from common import *
 
+def initialize_uninitialized(sess):
+    global_vars          = tf.global_variables()
+    is_not_initialized   = sess.run([tf.is_variable_initialized(var) for var in global_vars])
+    not_initialized_vars = [v for (v, f) in zip(global_vars, is_not_initialized) if not f]
+
+    print([str(i.name) for i in not_initialized_vars])
+    if len(not_initialized_vars):
+        sess.run(tf.variables_initializer(not_initialized_vars))
+
 def main(args):
     print("Devices list: ", device_lib.list_local_devices())
 
@@ -28,7 +37,7 @@ def main(args):
 
     loader = Loader(dataDir, batch_size=batch_size)
     print(loader.meta)
-    restore = False
+    restore = True
     with tf.Graph().as_default():
         X, Y = loader.loadDataset("train")
         # X_test, Y_test = loader.loadDataset("test")
@@ -48,6 +57,7 @@ def main(args):
             else:
                 print("Restoring network....")
                 model.restore(sess)
+                initialize_uninitialized(sess)
                 local_init = tf.local_variables_initializer()
                 sess.run([local_init])
 
@@ -58,8 +68,8 @@ def main(args):
             options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
 
-            for step in range(100000):
-                if not restore:
+            for step in range(150000):
+                if restore:
                     _x,_y = sess.run([X,Y])
                     summary, lossVal, _ = sess.run([merged, model.loss, model.train_op],
                                                    feed_dict={features: _x, labels: _y, dropout_keep_prob: 0.7},
