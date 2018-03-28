@@ -31,27 +31,21 @@ class Loader:
             serializedThing,
             features=example_features)
         feature, label = rows['feature'], rows['label']
-        feature, label = tf.sparse_tensor_to_dense(feature), tf.sparse_tensor_to_dense(label)
+        feature, label = tf.reshape(tf.sparse_tensor_to_dense(feature), [self.meta['feature_dense_shape'][0]]), tf.reshape(tf.sparse_tensor_to_dense(label), [self.meta['label_dense_shape'][0]])
+        feature, label = tf.cast(feature, dtype=tf.float32), tf.cast(label, dtype=tf.int8)
+
         return feature, label
-
-    def __reshaping(self, feature, label):
-        f,l = feature, label
-        f,l = tf.reshape(f, [self.meta['feature_dense_shape'][0]]), tf.reshape(l, [self.meta['label_dense_shape'][0]])
-
-        f, l = tf.cast(f, dtype=tf.float32), tf.cast(l, dtype=tf.int64)
-        print("reshaping_2", f, l)
-        return f, l
 
 
     def __loadDataset(self, filename, batch_size, repeat=True):
         with tf.name_scope('loadDataset'):
-            dataset = tf.data.TFRecordDataset(self.dirname + "/" + filename)
+            dataset = tf.data.TFRecordDataset(self.dirname + "/" + filename).prefetch(4*batch_size)
             if repeat:
                 dataset = dataset.repeat()
-            dataset = dataset.map(self.__serializedToRows)\
-                .map(self.__reshaping)\
-                .shuffle(10000)\
-                .batch(batch_size)
+            dataset = dataset.map(map_func=self.__serializedToRows, num_parallel_calls=20) \
+                        .batch(batch_size)\
+                        # .shuffle(1024)\
+
             return dataset
 
     def loadDataset(self, type):
