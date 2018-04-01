@@ -99,6 +99,9 @@ if __name__ == "__main__":
     random.shuffle(kmers)
     fixed_kmers = [kmers[i] for i in range(FIXED_POINTS)]
     print("Fixed points", fixed_kmers)
+    with open(OUTDIR + "/fixed-points", "w") as fout:
+        for k in fixed_kmers:
+            fout.write(k+"\n")
 
     df = []
     count = 0
@@ -131,6 +134,8 @@ if __name__ == "__main__":
 
     print("Test-Train split")
     train, test = train_test_split(df, test_size=0.20)
+    meta['train_size'] = len(train)
+    meta['test_size'] = len(test)
     print("Writing train to file")
     writeTFRecord(train, OUTDIR+"/train.tfrecords")
     print("Writing test to file")

@@ -39,7 +39,8 @@ class Loader:
             if repeat:
                 dataset = dataset.repeat()
             dataset = dataset.map(map_func=self._serializedToRows, num_parallel_calls=20) \
-                .batch(batch_size)
+                .batch(batch_size) \
+                .shuffle(buffer_size=100)
             return dataset
 
     def load_dataset(self, type):
@@ -50,7 +51,7 @@ class Loader:
             return self.trainDataset.make_one_shot_iterator().get_next()
         elif type == "test":
             if not self.testDataset:
-                self.testDataset = self._load_dataset(self.dirname + "/test.tfrecords", batch_size=self.batch_size, repeat=False)
+                self.testDataset = self._load_dataset(self.dirname + "/test.tfrecords", batch_size=self.batch_size)
             return self.testDataset.make_one_shot_iterator().get_next()
 
     def _get_meta(self, filename):
@@ -65,6 +66,15 @@ class Loader:
 
     def getTotal(self):
         return self.meta['total']
+
+    @property
+    def train_size(self):
+        return self.meta['train_size']
+
+    @property
+    def test_size(self):
+        return self.meta['test_size']
+
 
 if __name__=="__main__":
     feature,score = Loader(".", 10).load_dataset("test")

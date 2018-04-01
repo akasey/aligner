@@ -1,0 +1,15 @@
+input_features: 65536
+model:
+  multilayer:
+    name: 'multilayer'
+    input: 'input_features'
+    layer: [100,100]
+    activation: [tf.nn.sigmoid, None]
+    dropout_keep: 0.7
+training:
+  epoch: 50 # total number of epochs to train
+  batch_size: 512
+  eval_frequency: 50 # evaluation will be executed every xx minibatches of training
+  log_frequency: 10 # training loss information will be logged after every xx minibatches
+  histogram_frequency: 100 # histogram will be dumped for tensorboard
+  device: '/cpu:0'
