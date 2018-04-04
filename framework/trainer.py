@@ -1,7 +1,7 @@
-import tensorflow as tf
-import logging
 import math
-from common import make_logger
+import tensorflow as tf
+from .common import make_logger
+
 
 class TrainExecuter():
     def __init__(self, config):
@@ -65,7 +65,7 @@ class TrainExecuter():
             hist_stat, scalar_stat, loss = sess.run([summary_histogram_op, summary_scalar_op, loss_op])
             writer.add_summary(hist_stat, global_step=step)
             writer.add_summary(scalar_stat, global_step=step)
-            writer.add_summary(loss, global_step=step)
+            self.logger.info("Final loss: %f" % loss)
             model.save(sess)
             self.logger.info("Finished...")
 
