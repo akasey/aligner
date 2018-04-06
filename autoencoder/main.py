@@ -17,7 +17,7 @@ def main():
     sanity_check()
     config = Config(FLAGS.model_dir+"/hparam.yaml")
     loader = Loader(FLAGS.data_dir, config.training.get('batch_size', 512))
-    logger.info("Creating Multilayer model")
+    logger.info("Creating Autoencoder model")
     model = AutoEncoder(config)
     logger.info("Creating TrainExecutor")
     executer = TrainExecuter(config)

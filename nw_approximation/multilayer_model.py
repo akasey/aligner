@@ -1,13 +1,12 @@
-import math
-import numpy as np
 import tensorflow as tf
 
+from network import Network
 
-class MultiLayerModel():
+
+class MultiLayerModel(Network):
     def __init__(self, config):
-        self.device = config.training.get('device', '/cpu:0')
-        self.model_save_location = config.runtime.get('model_dir', '.') + "/tensorboard"
-        self.model_save_filename = "/multilayermodel.ckpt"
+        Network.__init__(self, config)
+        self.model_save_filename = config.model['multilayer'].get('name', 'multilayermodel') + ".ckpt"
         self.learning_rate = config.training.get('learning_rate', 0.0001)
 
         self.name = config.model['multilayer'].get('name', 'fcc')
@@ -17,49 +16,10 @@ class MultiLayerModel():
         self.input_shape = [None, config.input_features]
         self.out_shape = [None, self.hidden_layers[-1]]
 
-        self.model_matrices = {}
-        self.model_histogram = []
-        self.model_scalars = []
-
         self.train_op = None
         self.eval_mean_op = None
         self.eval_update_op = None
         self.prediction_op = None
-        self.saver = None
-
-
-    def _get_activation(self, str):
-        return eval(str)
-
-    def _get_weights(self, shape, name):
-        fan_in = np.prod(shape[0:-1])
-        std = 1 / math.sqrt(fan_in)
-        return tf.get_variable(name+"_weights", shape, initializer=tf.truncated_normal_initializer(stddev=std))
-
-    def _get_biases(self, shape, name):
-        return tf.get_variable(name + "_biases", [shape[-1]], initializer=tf.constant_initializer(value=0.01))
-
-    def _make_dense(self, ip_tensor, units, activation_fn, dropout_keep, name):
-        shape = [ip_tensor.shape[1].value, units]
-        with tf.device(self.device):
-            weights = self._get_weights(shape, name)
-            biases = self._get_biases(shape, name)
-            if activation_fn:
-                activation = tf.add(tf.matmul(ip_tensor, weights), biases)
-                activation = activation_fn(activation, name=name + "_activation")
-                activation = tf.nn.dropout(activation, keep_prob=dropout_keep)
-            else:
-                activation = tf.add(tf.matmul(ip_tensor, weights), biases, name=name + "_activation")
-
-        self.model_histogram.append(tf.summary.histogram(name + "_weights", weights))
-        self.model_histogram.append(tf.summary.histogram(name + "_biases", biases))
-        self.model_histogram.append(tf.summary.histogram(name + "_act", activation))
-
-        if not weights.name in self.model_matrices:
-            self.model_matrices[weights.name] = weights
-        if not biases.name in self.model_matrices:
-            self.model_matrices[biases.name] = biases
-        return activation
 
     def _encoder(self, inputs, dropout_keep):
         with tf.device(self.device), tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
@@ -108,32 +68,14 @@ class MultiLayerModel():
                 self.prediction_op = self._encoder(X['x1'], dropout_keep=1.0)
         return self.prediction_op
 
-    def summary_scalars(self):
-        return tf.summary.merge(self.model_scalars)
-
-    def summary_histograms(self):
-        return tf.summary.merge(self.model_histogram)
-
     def get_input_shape(self):
         return self.input_shape
 
     def get_output_shape(self):
         return self.out_shape
 
-    def save(self, sess):
-        if not self.saver:
-            self.saver = tf.train.Saver(self.model_matrices, max_to_keep=2)
-        self.saver.save(sess, self.model_save_location + self.model_save_filename, global_step=tf.train.get_global_step())
-
-    def restore(self, sess):
-        if not self.saver:
-            self.saver = tf.train.Saver(self.model_matrices, max_to_keep=2)
-        path = tf.train.latest_checkpoint(self.model_save_location)
-        if path:
-            self.saver.restore(sess, path)
-            return True
-        else:
-            return False
+    def getModelSaveFilename(self):
+        return self.model_save_filename
 
 
 

@@ -1,11 +1,11 @@
 import os
 import argparse
 import tensorflow as tf
-from config import Config
-from multilayer_model import MultiLayerModel
-from data_reader import Loader
-from trainer import TrainExecuter
-from common import make_logger
+from framework.config import Config
+from .multilayer_model import MultiLayerModel
+from .data_reader import Loader
+from framework.trainer import TrainExecuter
+from framework.common import make_logger
 
 def sanity_check():
     assert os.path.exists(FLAGS.model_dir+"/hparam.yaml"), FLAGS.model_dir+"/hparam.yaml" + " not found"

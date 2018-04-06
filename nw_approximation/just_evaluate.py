@@ -1,10 +1,10 @@
 import argparse
 import tensorflow as tf
 import numpy as np
-from config import Config
+from framework.config import Config
 from data_reader import Loader
 from multilayer_model import MultiLayerModel
-from common import make_logger
+from framework.common import make_logger
 
 number_of_row = 8192
 def getInputFn(data_dir):
