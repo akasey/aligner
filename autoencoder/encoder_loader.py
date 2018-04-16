@@ -56,9 +56,6 @@ class Loader:
     def getInputShape(self):
         return [None, self.meta['input_shape'][0]]
 
-    def getTotal(self):
-        return self.meta['total']
-
     @property
     def train_size(self):
         return self.meta['train_size']

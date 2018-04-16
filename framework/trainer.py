@@ -1,6 +1,6 @@
 import math
 import tensorflow as tf
-from .common import make_logger
+from .common import make_logger, make_session
 
 
 class TrainExecuter():
@@ -18,7 +18,7 @@ class TrainExecuter():
     def run(self, model, loader):
         writer = self.make_writer()
 
-        with self.make_session() as sess:
+        with make_session(self.device) as sess:
             global_step = tf.Variable(0, trainable=False, name='global_step')
             self.logger.info("Loading training datasets..")
             features, labels = loader.load_dataset("train")
@@ -35,7 +35,8 @@ class TrainExecuter():
             summary_scalar_op = model.summary_scalars()
             summary_histogram_op = model.summary_histograms()
 
-            max_steps = math.ceil(loader.getTotal() / self.batch_size) * self.epoch
+            assert loader.train_size > 0, "Training size isn't  >0"
+            max_steps = math.ceil(loader.train_size / self.batch_size) * self.epoch
             self.do_init(sess, model)
             writer.add_graph(sess.graph)
             self.logger.info("Initializaton complete now running into loop")
@@ -68,11 +69,6 @@ class TrainExecuter():
             self.logger.info("Final loss: %f" % loss)
             model.save(sess)
             self.logger.info("Finished...")
-
-
-    def make_session(self):
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.33)
-        return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
     def make_writer(self):
         writer = tf.summary.FileWriter(self.config.runtime['model_dir'] + "/tensorboard", flush_secs=120)

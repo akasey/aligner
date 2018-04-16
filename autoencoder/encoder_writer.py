@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
@@ -30,21 +31,24 @@ class Kmer_Utility:
         return lines
 
     @staticmethod
-    def slidingWindow(segment, winlength):
+    def slidingWindow(segment, winlength, strides=1):
         windows = []
-        for i in range(len(segment)-winlength+1):
-            window = segment[i:i+winlength]
+        starting_points = [start for start in range(0,len(segment)-winlength, strides)]
+        if starting_points[-1] + winlength < len(segment):
+            starting_points.append(len(segment)-winlength)
+        for start in starting_points:
+            window = segment[start:start+winlength]
             windows.append(window)
         return windows
 
     @staticmethod
-    def encodeKmerBagOfWords(window, last_window=None, last_encoded_window=None):
+    def encodeKmerBagOfWords(window, K=k, last_window=None, last_encoded_window=None):
         # incremental -- Not sure if dictionary order is preserved
         if last_window is not None and last_encoded_window is not None and last_window[1:] == window[0:-1]:
-            last_start_kmer = last_window[0:0 + k]
+            last_start_kmer = last_window[0:0 + K]
             # last_encoded_window[encodeKmer(last_start_kmer)] = max(0, last_encoded_window[encodeKmer(last_start_kmer)]-1)
             last_encoded_window[Kmer_Utility.encodeKmer(last_start_kmer)] -= 1
-            this_end_kmer = window[-k:]
+            this_end_kmer = window[-K:]
             last_encoded_window[Kmer_Utility.encodeKmer(this_end_kmer)] += 1
             return last_encoded_window
 
@@ -54,6 +58,18 @@ class Kmer_Utility:
             kmer_num = Kmer_Utility.encodeKmer(window[i:i + k])
             b[kmer_num] += 1
         return b.flatten()
+
+    @staticmethod
+    def getSegments(genome, segmentLength, windowLen):
+        genomeLength = len(genome)
+        numSegments = math.ceil(float(genomeLength) / float(segmentLength))
+        segments = []
+        for i in range(numSegments):
+            start = max(0, i * segmentLength - math.floor(windowLen / 2.0))
+            end = min((i + 1) * segmentLength + math.ceil(windowLen / 2.0) - 1, genomeLength)
+            segment = genome[start:end]
+            segments.append((i, segment))
+        return numSegments, segments
 
     @staticmethod
     def sparseRepresentation(arr):

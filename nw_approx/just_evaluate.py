@@ -1,13 +1,16 @@
 import argparse
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
 
-from autoencoder import AutoEncoder
-from encoder_loader import Loader
-from framework.common import make_logger, make_session
+from nw_approx.model import Encoder_Model
+from nw_approx.pretrain_reader import PreTrainLoader
+from framework.common import make_logger
 from framework.config import Config
 
+
+def make_session():
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.93)
+    return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
 
 def unwanted_stuffs(sess, model, loader, logger):
     logger.info("Loading training datasets..")
@@ -30,19 +33,20 @@ def do_init(sess, model):
         sess.run([local_init])
 
 def main():
-    logger = make_logger("just_evaluate")
+    logger = make_logger("nw_approx_evaluate")
     config = Config(FLAGS.model_dir + "/hparam.yaml")
     batch_size = 1#config.training.get('batch_size', 128)
-    projection_layer_size = config.model['autoencoder']['encoding_layer']
+    projection_layer_size = config.model['multilayer']['layer'][-1]
     input_shape = config.input_features
-    model = AutoEncoder(config)
-    loader = Loader(FLAGS.data_dir, batch_size)
+    model = Encoder_Model(config)
+    loader = PreTrainLoader(FLAGS.data_dir, batch_size)
     features, labels = loader.load_dataset("test")
+    device = config.training.get('device', '/cpu:0')
 
-    total = 1000
+    total = 5000
     actual_data = np.zeros([total, input_shape], dtype=np.float32)
     embedding = np.zeros([total,projection_layer_size], dtype=np.float32)
-    with make_session('/cpu:0') as sess:
+    with make_session(device) as sess:
         unwanted_stuffs(sess, model, loader, logger)
         prediction_op = model.prediction(features)
         prediction_op = tf.nn.sigmoid(prediction_op)
@@ -52,16 +56,6 @@ def main():
             inputs, predictions = sess.run([features, prediction_op])
             actual_data[i,:] = inputs
             embedding[i,:] = predictions
-
-        logger.info("Computing similarity...")
-        gram_matrix = np.matmul(embedding, embedding.T)
-        # gram_matrix = np.linalg.norm(gram_matrix, 'fro')
-        plt.imshow(gram_matrix, cmap='hot')
-        plt.show()
-        top_k = 20
-        for i in np.random.randint(0, total, 200):
-            nearest = (-gram_matrix[i, :]).argsort()[1:top_k + 1]
-            print(i, "close to", [str(j)+" " + str(gram_matrix[i][j]) for j in nearest])#, " with score ", gram_matrix[i][j])
 
         embedding_tensor = tf.placeholder(tf.float32, shape=[total,projection_layer_size])
         embedding_matrix = tf.get_variable("embedding_matrix", [total,projection_layer_size], initializer=tf.constant_initializer(value=0.0))
@@ -87,7 +81,7 @@ if __name__=="__main__":
     parser.add_argument(
         "--model_dir",
         type=str,
-        default="sample_autoencoder_run/5000_500/",
+        default="sample_autoencoder_run/5000_3000_1500/",
         help="Path for storing the model checkpoints.")
 
     FLAGS, unparsed = parser.parse_known_args()
