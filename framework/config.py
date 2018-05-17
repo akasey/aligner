@@ -19,6 +19,9 @@ class Config:
     def __getRuntimeInfo(self):
         self.runtime['model_dir'] = os.path.dirname(os.path.realpath(self.filename))
 
+    def __getitem__(self, item):
+        return self.config[item]
+
     @property
     def training(self):
         return self.config.get('training', None)

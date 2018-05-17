@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import tensorflow as tf
+import os
 
 class Network():
     def __init__(self, config):
@@ -25,7 +26,7 @@ class Network():
     def _get_biases(self, shape, name):
         return tf.get_variable(name + "_biases", [shape[-1]], initializer=tf.constant_initializer(value=0.0001))
 
-    def _make_dense(self, ip_tensor, units, activation_fn, dropout_keep, name):
+    def _make_dense(self, ip_tensor, units, activation_fn, dropout_keep, name, histogram=True):
         shape = [ip_tensor.shape[1].value, units]
         with tf.device(self.device):
             weights = self._get_weights(shape, name)
@@ -37,9 +38,10 @@ class Network():
             else:
                 activation = tf.add(tf.matmul(ip_tensor, weights), biases, name=name + "_activation")
 
-        self.model_histogram.append(tf.summary.histogram(name + "_weights", weights))
-        self.model_histogram.append(tf.summary.histogram(name + "_biases", biases))
-        self.model_histogram.append(tf.summary.histogram(name + "_act", activation))
+        if histogram:
+            self.model_histogram.append(tf.summary.histogram(name + "_weights", weights))
+            self.model_histogram.append(tf.summary.histogram(name + "_biases", biases))
+            self.model_histogram.append(tf.summary.histogram(name + "_act", activation))
 
         if not weights.name in self.model_matrices:
             self.model_matrices[weights.name] = weights
@@ -57,6 +59,8 @@ class Network():
         if not self.saver:
             self.saver = tf.train.Saver(self.model_matrices, max_to_keep=2)
         self.saver.save(sess, self.model_save_location + "/" + self.getModelSaveFilename(), global_step=tf.train.get_global_step())
+        if not os.path.exists(self.model_save_location + "/model.pb"):
+            tf.train.write_graph(sess.graph.as_graph_def(), self.model_save_location, "model.pb")
 
     def restore(self, sess):
         if not self.saver:

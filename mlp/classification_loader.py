@@ -1,3 +1,4 @@
+import argparse
 import random
 import tensorflow as tf
 import numpy as np
@@ -8,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from autoencoder.encoder_writer import Kmer_Utility as ku
 from framework.common import make_logger
 from framework.serializer import Serializer
-
+from fastamm import FastaMM
 
 logging = make_logger("classification_loader.py")
 def logger(fn):
@@ -46,7 +47,9 @@ class Classification_Loader:
         return tf.data.TFRecordDataset(filename).map(self.serialization.deserialize, num_parallel_calls=parallelism)
 
     def __separate(self, dictionary):
-        return dictionary['input'], dictionary['output']
+        X,Y = dictionary['input'], dictionary['output']
+        X,Y = tf.cast(X, tf.float32), tf.cast(Y, tf.float32)
+        return X,Y
 
     def load_dataset(self, type):
         filename = "train.tfrecords" if type=="train" else "test.tfrecords"
@@ -75,9 +78,9 @@ class Classification_Writer:
         self.logger = make_logger("ClassificationWriter")
         self.directory = dirname
         self.output_shards = 5
-        self.K = 6
-        self.segment_length = 10000
-        self.window_length = 1000
+        self.K = 7
+        self.segment_length = 5000
+        self.window_length = 500
         self.strides = self.K-1
         self.mutation_freq = 3
         self.mutation_prob = 0.2
@@ -87,18 +90,19 @@ class Classification_Writer:
         self.meta = {}
 
     @logger
-    def _read_windows_segments(self, fasta):
-        genome = ku.readGenome(fasta)
-        numSegments, segments = ku.getSegments(genome, segmentLength=self.segment_length, windowLen=self.window_length)
+    def _read_windows_segments(self, fastamm):
         allWindows = {}
-        for segID, segment in segments:
+        totalSegments = []
+        for segID, segment in fastamm.allClassificationJob():
+            totalSegments.append(segID)
             wins = ku.slidingWindow(segment=segment, winlength=self.window_length, strides=self.strides)
             for win in wins:
                 if win in allWindows:
                     allWindows[win].append(segID)
                 else:
                     allWindows[win] = [segID]
-                    allWindows.update()
+
+        numSegments = len(totalSegments)
         return numSegments, allWindows
 
     @logger
@@ -195,9 +199,18 @@ class Classification_Writer:
                 serializable_features = self.serialization.make_serializable(input=input, output=output)
                 writer.write(serializable_features)
 
+    @logger
+    def create_fasta_mlp_minhash_interface(self):
+        fasta = self.directory + "/sequence.fasta"
+        fastamm = FastaMM(fasta, self.segment_length, self.window_length, self.K)
+        fastamm.init()
+        return fastamm
+
     def write(self):
         self.logger.info("Initiating...")
-        numSegments, allWindows = self._read_windows_segments(self.directory +"/sequence.fasta")
+        fastamm = self.create_fasta_mlp_minhash_interface()
+        numSegments, allWindows = self._read_windows_segments(fastamm)
+        fastamm.writeMeta(self.directory)
         numSegments, allWindows = self._add_unknown_windows(numSegments, allWindows)
         allWindows = self._introduce_mutations(allWindows)
         train, test = self._test_train_split(allWindows)
@@ -212,15 +225,38 @@ class Classification_Writer:
         self._export_meta()
 
 
+def reader_main():
+    loader = Classification_Loader(FLAGS.data_dir, 1)
+    features, labels = loader.load_dataset("test")
+    with tf.Session() as sess:
+        f,l = sess.run([features, labels])
+        print("input", f, f.shape)
+        print("output", l, l.shape)
+
+def write_main():
+    writer = Classification_Writer(FLAGS.data_dir)
+    writer.write()
+
+def main():
+    write_main()
+    # reader_main()
+
+
 if __name__=="__main__":
-    loader = Classification_Loader("sample_classification_run/", 1)
-    features = loader.load_dataset("train")
-    sess = tf.Session()
-    for i in range(10):
-        f = sess.run([features])
-        print(f)
-    # writer = Classification_Writer("sample_classification_run/")
-    # writer.write()
+    parser = argparse.ArgumentParser()
+    parser.register("type", "bool", lambda v: v.lower() == "true")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default="sample_classification_run/",
+        help="Where is input data dir? use data_generation.py to create one")
+
+    FLAGS, unparsed = parser.parse_known_args()
+    try:
+        sess = tf.Session()
+    except:
+        pass
+    main()
 
 
 

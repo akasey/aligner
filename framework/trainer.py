@@ -3,6 +3,21 @@ import tensorflow as tf
 from .common import make_logger, make_session
 
 
+def make_predict_op(model, features, labels):
+    if type(features) is dict:
+        inputs = {}
+        for key, value in features.items():
+            inputs[key] = tf.placeholder(value.dtype, shape=value.shape, name="inputs_"+key)
+        prediction = model.prediction(inputs)
+        prediction = tf.identity(prediction, name="output_logits")
+        return prediction
+    else:
+        X = tf.placeholder(features.dtype, shape=features.shape, name="inputs")
+        prediction = model.prediction(X)
+        prediction = tf.identity(prediction, name="output_logits")
+        return prediction
+
+
 class TrainExecuter():
     def __init__(self, config):
         self.config = config
@@ -28,9 +43,11 @@ class TrainExecuter():
             self.logger.info("Loading test datasets..")
             features_eval, labels_eval = loader.load_dataset("test")
 
-            self.eval_y = tf.placeholder(tf.float32, name="eval_labels", shape=model.get_output_shape())
             self.logger.info("Making eval op...")
             eval_mean_op, eval_update_op = model.evaluation(features_eval, labels_eval)
+
+            self.logger.info("Making predict op for placeholder in graph...")
+            _ = make_predict_op(model, features,labels)
 
             summary_scalar_op = model.summary_scalars()
             summary_histogram_op = model.summary_histograms()
@@ -76,6 +93,9 @@ class TrainExecuter():
 
     def evaluate(self, sess, eval_update_op, loader):
         counter = 0
+        running_vars = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope="evaluation")
+        running_vars_reset = tf.variables_initializer(var_list=running_vars)
+        _ = sess.run([running_vars_reset])
         while counter < loader.test_size:
             act_out = sess.run([eval_update_op])
             counter += self.batch_size

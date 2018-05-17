@@ -13,10 +13,10 @@ def make_logger(name):
     logger.addHandler(ch)
     return logger
 
-def make_session(device, memory_fraction=0.33):
+def make_session(device):
     if "gpu" in device:
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=memory_fraction)
-        return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True, device_count={'GPU':1}))
     else:
         return tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 
@@ -27,3 +27,4 @@ def sparseRepresentation(arr):
     values = arr[indices0]
     dense_shape = np.array([np.shape(arr)[0], 1])
     return indices0, indices1, values, dense_shape
+

@@ -82,6 +82,9 @@ class SparseDataType:
 
 
 class Serializer:
+    """
+    Serializer is a helper class for serializing numpy arrays into TFRecords.
+    """
     def __init__(self, input):
         self.meta = None
         self.impl = ['dense', 'sparse']
