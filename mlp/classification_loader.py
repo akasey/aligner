@@ -82,7 +82,7 @@ class Classification_Writer:
         self.segment_length = 5000
         self.window_length = 500
         self.strides = self.K-1
-        self.mutation_freq = 3
+        self.mutation_freq = 5
         self.mutation_prob = 0.2
         self.unknown_window_fraction = 0.2
 
@@ -129,9 +129,31 @@ class Classification_Writer:
         seq = list(sequence)
         rand = np.random.rand(len(sequence))
         mutIdx = np.argwhere(rand <= probability).flatten()
-        for i in mutIdx:
-            seq[i] = self.nucArr[random.randint(0, 3)]
-        return "".join(seq)
+        # if mutIdx are consecutive, group them to single list.. consecutive_mutIdx is 2-dimensional
+        consecutive_mutIdx = np.split(mutIdx, np.where(np.diff(mutIdx) != 1)[0]+1)
+        offset = 0 # indel needs mutIdx to shift accordingly. For every indel, offset++
+        insertion = True
+        for bunch in consecutive_mutIdx:
+            if len(bunch) < 3:
+                # substitution error
+                for idx in bunch:
+                    seq[idx+offset] = self.nucArr[random.randint(0, 3)]
+            else:
+                # insertion error
+                if insertion:
+                    for idx in bunch:
+                        seq.insert(idx+offset, self.nucArr[random.randint(0, 3)])
+                        offset += 1
+                else:
+                    for idx in bunch:
+                        del seq[idx+offset]
+                        offset -= 1
+                insertion = not insertion
+        # insertion error again until sequence length is met
+        while len(seq) < len(sequence):
+            seq.append(self.nucArr[random.randint(0, 3)])
+
+        return "".join(seq[0:len(sequence)]) # truncate tail if seq is longer than sequence
 
     def __mutation_func(self, window, probability, how_many):
         mutations = []
@@ -152,6 +174,9 @@ class Classification_Writer:
     def _export_meta(self):
         np.save(self.directory +"/meta.npy", self.meta)
         self.serialization.save_meta(self.directory+"/serialization-meta.npy")
+        with open(self.directory + "/README", "w") as fout:
+            for k,v in vars(self).items():
+                fout.write("%s: %s\n" % (str(k), str(v)) )
 
     @logger
     def _introduce_mutations(self, allWindows):
@@ -170,10 +195,12 @@ class Classification_Writer:
         allWindows.update(allMutations)
         return allWindows
 
-    def _one_hot_input(self, window):
+    def _one_hot_input(self, window, reverse=False):
+        window = ku.reverse_complement(window) if reverse else window
         bow = ku.encodeKmerBagOfWords(window, K=self.K)
-        b = np.zeros(len(bow))
+        b = np.zeros(len(bow) + 1)
         b[np.argwhere(bow)] = 1
+        b[-1] = 1 if reverse else 0
         return b
 
     def _one_hot_output(self, segIds, totalSegments):
@@ -194,10 +221,15 @@ class Classification_Writer:
     def write_tf(self, df, allWindows, numSegments, filename):
         with tf.python_io.TFRecordWriter(filename) as writer:
             for window in df:
-                input = self._one_hot_input(window)
+                input = self._one_hot_input(window, reverse=False)
                 output = self._one_hot_output(allWindows[window], numSegments)
                 serializable_features = self.serialization.make_serializable(input=input, output=output)
                 writer.write(serializable_features)
+                # Reverse window
+                input2 = self._one_hot_input(window, reverse=True)
+                serializable_features = self.serialization.make_serializable(input=input2, output=output)
+                writer.write(serializable_features)
+
 
     @logger
     def create_fasta_mlp_minhash_interface(self):
@@ -214,9 +246,9 @@ class Classification_Writer:
         numSegments, allWindows = self._add_unknown_windows(numSegments, allWindows)
         allWindows = self._introduce_mutations(allWindows)
         train, test = self._test_train_split(allWindows)
-        self.__register_meta('train_size', len(train))
-        self.__register_meta('test_size', len(test))
-        self.__register_meta('total', len(allWindows))
+        self.__register_meta('train_size', 2*len(train)) # Two times for reverse complement strand
+        self.__register_meta('test_size', 2*len(test))
+        self.__register_meta('total', 2*len(allWindows))
         self._create_serializer()
         self.write_tf(train, allWindows, numSegments, self.directory+"/train.tfrecords")
         del train
@@ -248,7 +280,8 @@ if __name__=="__main__":
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="sample_classification_run/",
+        # default="sample_classification_run/",
+        default="Carsonella_ruddii/",
         help="Where is input data dir? use data_generation.py to create one")
 
     FLAGS, unparsed = parser.parse_known_args()

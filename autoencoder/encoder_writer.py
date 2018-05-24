@@ -6,11 +6,17 @@ import tensorflow as tf
 workDir = "sample_autoencoder_run"
 WINDOW_LEN = 1000
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
+revMap = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G'}
 k=6
 
 kmerEncoding = {}
 
 class Kmer_Utility:
+    @staticmethod
+    def reverse_complement(window):
+        toRet = [revMap[x] if x in revMap.keys() else x for x in window[::-1]]
+        return ''.join(toRet)
+
     @staticmethod
     def encodeKmer(kmer):
         if kmer in kmerEncoding:
@@ -53,9 +59,9 @@ class Kmer_Utility:
             return last_encoded_window
 
         # sliding kmer extraction
-        b = np.zeros(4 ** k)
-        for i in range(len(window) - k + 1):
-            kmer_num = Kmer_Utility.encodeKmer(window[i:i + k])
+        b = np.zeros(4 ** K)
+        for i in range(len(window) - K + 1):
+            kmer_num = Kmer_Utility.encodeKmer(window[i:i + K])
             b[kmer_num] += 1
         return b.flatten()
 

@@ -22,6 +22,7 @@ class AutoEncoder(Network):
         self.eval_mean_op = None
         self.eval_update_op = None
         self.prediction_op = None
+        self.eval_output_logit = None
 
 
     def _Wx_b(self, x, W, b, activation, name, dropout_keep=None):
@@ -108,17 +109,17 @@ class AutoEncoder(Network):
             with tf.device(self.device), tf.name_scope('train'):
                 chain = self._form_encode_decode_chain(X, self.dropout_keep)
                 logits = tf.nn.sigmoid_cross_entropy_with_logits(labels=Y, logits=chain)
-                self.loss_op = tf.reduce_mean(logits)
+                self.loss_op = tf.reduce_sum(logits)
                 optimizer = tf.train.AdamOptimizer(self.learning_rate)
-                self.train_op = optimizer.minimize(self.loss_op)
+                self.train_op = optimizer.minimize(self.loss_op, global_step=tf.train.get_global_step())
                 self.model_scalars.append(tf.summary.scalar("loss", self.loss_op))
         return self.train_op, self.loss_op
 
     def evaluation(self, X, Y):
         if self.eval_mean_op == None or self.eval_update_op == None:
             with tf.device(self.device), tf.name_scope('evaluation'):
-                chain = self._form_encode_decode_chain(X, 1.0)
-                sigmoid_out = tf.nn.sigmoid_cross_entropy_with_logits(labels=Y, logits=chain)
+                self.eval_output_logit = self._form_encode_decode_chain(X, 1.0)
+                sigmoid_out = tf.nn.sigmoid_cross_entropy_with_logits(labels=Y, logits=self.eval_output_logit)
                 self.eval_mean_op, self.eval_update_op = tf.metrics.mean(sigmoid_out)
                 self.model_scalars.append(tf.summary.scalar("evaluation", self.eval_mean_op))
         return self.eval_mean_op, self.eval_update_op
