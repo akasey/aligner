@@ -10,28 +10,20 @@ class Loader:
         self.meta = self._get_meta(dirname+"/meta.npy")
 
     def _serializedToRows(self, serializedThing):
-        example_features = {'x1': tf.SparseFeature(index_key=['kmer1_indices_0', 'kmer1_indices_1'],
-                                                        value_key='kmer1_values',
+        example_features = {'x1': tf.SparseFeature(index_key=['indices_0', 'indices_1'],
+                                                        value_key='values',
                                                         dtype=tf.int64,
-                                                        size=[self.meta['input_shape'][0], 1]),
-                            'x2': tf.SparseFeature(index_key=['kmer2_indices_0', 'kmer2_indices_1'],
-                                                        value_key='kmer2_values',
-                                                        dtype=tf.int64,
-                                                        size=[self.meta['input_shape'][0], 1]),
-                            'score': tf.FixedLenFeature([1], tf.int64)}
+                                                        size=[self.meta['input_shape'][0], 1])
+                            }
 
         rows = tf.parse_single_example(
             serializedThing,
             features=example_features)
-        x1, x2, score = rows['x1'], rows['x2'], rows['score']
-        x1, x2 = tf.sparse_tensor_to_dense(x1), tf.sparse_tensor_to_dense(x2)
-        x1,x2, score = tf.reshape(x1, [self.meta['input_shape'][0], ]), tf.reshape(x2, [self.meta['input_shape'][0], ]), tf.reshape(score, [1,])
-        x1, x2, score = tf.cast(x1, dtype=tf.float32), tf.cast(x2, dtype=tf.float32), tf.cast(score, dtype=tf.float32)
-
-        feature = {'x1':x1, 'x2':x2}
-
-        return feature,score
-
+        x1 = rows['x1']
+        x1 = tf.sparse_tensor_to_dense(x1)
+        x1 = tf.reshape(x1, [self.meta['input_shape'][0], ])
+        x1 = tf.cast(x1, dtype=tf.float32)
+        return x1, x1
 
     def _load_dataset(self, filename, batch_size, repeat=True):
         with tf.name_scope('loadDataset'):
@@ -71,10 +63,3 @@ class Loader:
     @property
     def test_size(self):
         return self.meta['test_size']
-
-
-if __name__=="__main__":
-    feature,score = Loader(".", 10).load_dataset("test")
-    with tf.Session() as sess:
-        xfeature, xscore = sess.run([feature, score])
-        print(xfeature['x1'].shape, xfeature['x2'].shape, xscore.shape)

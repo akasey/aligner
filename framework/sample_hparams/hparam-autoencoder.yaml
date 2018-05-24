@@ -1,0 +1,18 @@
+input_features: 4096
+model:
+  autoencoder:
+    name: 'auto_encoder'
+    input: 'input_features'
+    layers: [3000,2000]
+    activation: [tf.nn.relu, tf.nn.relu]
+    encoding_layer: 1000
+    encoding_activation: tf.nn.sigmoid
+    learning_rate: 0.01
+    dropout_keep: 0.7
+training:
+  epoch: 50 # total number of epochs to train
+  batch_size: 512
+  eval_frequency: 50 # evaluation will be executed every xx minibatches of training
+  log_frequency: 10 # training loss information will be logged after every xx minibatches
+  histogram_frequency: 100 # histogram will be dumped for tensorboard
+  device: '/cpu:0'
