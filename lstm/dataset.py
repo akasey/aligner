@@ -13,9 +13,8 @@ class LSTMClassificationLoader(Classification_Loader):
 
     def _get_shape(self):
         if self.x_shape is None:
-            length = self.meta['window_length']
-            k = self.meta['K']
-            self.x_shape = (length-k+1, 4**k)
+            input_shape = self.meta['input_shape'].split('x')
+            self.x_shape = (int(input_shape[0]), int(input_shape[1]))
         return self.x_shape
 
     def _separate(self, dictionary):
@@ -52,6 +51,7 @@ class LSTMClassificationWriter(Classification_Writer):
         rows = range(len(time_series))
         cols = [ku.encodeKmer(timestep) for timestep in time_series]
         toRet[rows,cols] = 1
+        self._register_meta('input_shape', str(toRet.shape[0])+'x'+str(toRet.shape[1]))
         return toRet.reshape((-1))
 
     @logger
@@ -60,6 +60,7 @@ class LSTMClassificationWriter(Classification_Writer):
             for window in df:
                 input = self._one_hot_input(window, reverse=False)
                 output = self._one_hot_output(allWindows[window], numSegments)
+                self._register_meta('output_shape', output.shape[0])
                 serializable_features = self.serialization.make_serializable(input=input, output=output)
                 writer.write(serializable_features)
                 # Reverse window
@@ -97,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--mode",
         type=str,
-        default="write",
+        default="read",
         help="Modes: {write, read}"
     )
 

@@ -3,6 +3,7 @@ import random
 import tensorflow as tf
 import numpy as np
 import os
+import yaml
 
 from sklearn.model_selection import train_test_split
 
@@ -34,13 +35,18 @@ class Classification_Loader:
 
 
     def _load_meta(self, directory):
-        filename = directory + "/meta.npy"
+        filename = directory + "/meta.yaml"
         if os.path.exists(filename):
-            metaTemp = np.load(filename)
-            meta = {}
-            for k in metaTemp.item():
-                meta[k] = metaTemp.item().get(k)
-            return meta
+            with open(filename, "r") as fin:
+                return yaml.load(fin)
+        else:
+            filename = directory + "/meta.npy"
+            if os.path.exists(filename):
+                metaTemp = np.load(filename)
+                meta = {}
+                for k in metaTemp.item():
+                    meta[k] = metaTemp.item().get(k)
+                return meta
         return None
 
     def _deserialize_file(self, filename, parallelism=4):
@@ -171,8 +177,17 @@ class Classification_Writer:
             self.meta[key] = value
 
     @logger
-    def _export_meta(self):
+    def _export_meta_old(self):
         np.save(self.directory +"/meta.npy", self.meta)
+        self.serialization.save_meta(self.directory+"/serialization-meta.npy")
+        with open(self.directory + "/README", "w") as fout:
+            for k,v in vars(self).items():
+                fout.write("%s: %s\n" % (str(k), str(v)) )
+
+    @logger
+    def _export_meta(self):
+        with open(self.directory+"/meta.yaml", "w") as fout:
+            yaml.dump(self.meta, fout, default_flow_style=False)
         self.serialization.save_meta(self.directory+"/serialization-meta.npy")
         with open(self.directory + "/README", "w") as fout:
             for k,v in vars(self).items():
