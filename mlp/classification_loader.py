@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from autoencoder.encoder_writer import Kmer_Utility as ku
 from framework.common import make_logger
 from framework.serializer import Serializer
-from fastamm import FastaMM
+from .fastamm import FastaMM
 
 logging = make_logger("classification_loader.py")
 def logger(fn):
@@ -46,7 +46,7 @@ class Classification_Loader:
     def _deserialize_file(self, filename, parallelism=4):
         return tf.data.TFRecordDataset(filename).map(self.serialization.deserialize, num_parallel_calls=parallelism)
 
-    def __separate(self, dictionary):
+    def _separate(self, dictionary):
         X,Y = dictionary['input'], dictionary['output']
         X,Y = tf.cast(X, tf.float32), tf.cast(Y, tf.float32)
         return X,Y
@@ -62,7 +62,7 @@ class Classification_Loader:
             if self.test_dataset is None:
                 self.test_dataset = self._deserialize_file(filename)
             dataset = self.test_dataset
-        dataset = dataset.map(self.__separate).shuffle(1000).batch(self.batch_size).repeat()
+        dataset = dataset.map(self._separate).shuffle(1000).batch(self.batch_size).repeat()
         return dataset.make_one_shot_iterator().get_next()
 
     @property
@@ -115,7 +115,7 @@ class Classification_Writer:
         for sample in known_samples:
             while True:
                 mutation_probability = min(self.mutation_prob + 0.1 + random.random(), 1.0)
-                mutated_sequence = self.__mutate(sample, mutation_probability)
+                mutated_sequence = self._mutate(sample, mutation_probability)
                 if mutated_sequence not in mutations and mutated_sequence not in allWindows:
                     break
             mutations[mutated_sequence] = [numSegments] # unknown sequence is class last
@@ -125,7 +125,7 @@ class Classification_Writer:
         return numSegments+1, allWindows # adding in unknown as classifyable class
 
 
-    def __mutate(self, sequence, probability):
+    def _mutate(self, sequence, probability):
         seq = list(sequence)
         rand = np.random.rand(len(sequence))
         mutIdx = np.argwhere(rand <= probability).flatten()
@@ -155,18 +155,18 @@ class Classification_Writer:
 
         return "".join(seq[0:len(sequence)]) # truncate tail if seq is longer than sequence
 
-    def __mutation_func(self, window, probability, how_many):
+    def _mutation_func(self, window, probability, how_many):
         mutations = []
         for i in range(how_many):
-            mutations.append(self.__mutate(window, probability))
+            mutations.append(self._mutate(window, probability))
         return mutations
 
-    def __merge_lists(self, list1, list2):
+    def _merge_lists(self, list1, list2):
         # first list plus unique things in list2, not in list1
         resultant = list1 + list(set(list2) - set(list1))
         return resultant
 
-    def __register_meta(self, key, value):
+    def _register_meta(self, key, value):
         if key not in self.meta:
             self.meta[key] = value
 
@@ -182,12 +182,12 @@ class Classification_Writer:
     def _introduce_mutations(self, allWindows):
         allMutations = {}
         for window, segIds in allWindows.items():
-            mutated_windows = self.__mutation_func(window, self.mutation_prob, self.mutation_freq)
+            mutated_windows = self._mutation_func(window, self.mutation_prob, self.mutation_freq)
             for mwindow in mutated_windows:
                 if mwindow in allMutations:
-                    allMutations[mwindow] = self.__merge_lists(segIds, allMutations[mwindow])
+                    allMutations[mwindow] = self._merge_lists(segIds, allMutations[mwindow])
                 elif mwindow in allWindows:
-                    allMutations[mwindow] = self.__merge_lists(segIds, allWindows[mwindow])
+                    allMutations[mwindow] = self._merge_lists(segIds, allWindows[mwindow])
                 else:
                     allMutations[mwindow] = segIds
 
@@ -246,9 +246,9 @@ class Classification_Writer:
         numSegments, allWindows = self._add_unknown_windows(numSegments, allWindows)
         allWindows = self._introduce_mutations(allWindows)
         train, test = self._test_train_split(allWindows)
-        self.__register_meta('train_size', 2*len(train)) # Two times for reverse complement strand
-        self.__register_meta('test_size', 2*len(test))
-        self.__register_meta('total', 2*len(allWindows))
+        self._register_meta('train_size', 2 * len(train)) # Two times for reverse complement strand
+        self._register_meta('test_size', 2 * len(test))
+        self._register_meta('total', 2 * len(allWindows))
         self._create_serializer()
         self.write_tf(train, allWindows, numSegments, self.directory+"/train.tfrecords")
         del train

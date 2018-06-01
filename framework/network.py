@@ -55,16 +55,19 @@ class Network():
     def summary_histograms(self):
         return tf.summary.merge(self.model_histogram)
 
+    def _get_saver(self):
+        return tf.train.Saver(self.model_matrices, max_to_keep=2)
+
     def save(self, sess):
         if not self.saver:
-            self.saver = tf.train.Saver(self.model_matrices, max_to_keep=2)
+            self.saver = self._get_saver()
         self.saver.save(sess, self.model_save_location + "/" + self.getModelSaveFilename(), global_step=tf.train.get_global_step())
         if not os.path.exists(self.model_save_location + "/model.pb"):
             tf.train.write_graph(sess.graph.as_graph_def(), self.model_save_location, "model.pb")
 
     def restore(self, sess):
         if not self.saver:
-            self.saver = tf.train.Saver(self.model_matrices, max_to_keep=2)
+            self.saver = self._get_saver()
         path = tf.train.latest_checkpoint(self.model_save_location)
         if path:
             self.saver.restore(sess, path)

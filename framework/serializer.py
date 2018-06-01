@@ -36,9 +36,14 @@ class SparseDataType:
         self.key = key
         self.constraints = None
 
+    def __get_dtype_for_indices(self, data):
+        if data.shape[0] > 2**16:
+            return tf.int32;
+        return tf.uint16;
+
     def __create_constraints_meta(self, data):
         constraints = {
-            'dtype_0': tf.uint16,
+            'dtype_0': self.__get_dtype_for_indices(data),
             'shape': np.array([np.shape(data)[0], 1]),
             'dtype_values': tf.uint8
         }
@@ -58,8 +63,10 @@ class SparseDataType:
         values_str = [values.astype(self.constraints['dtype_values'].as_numpy_dtype).tostring()]
 
         features = {
-            self.key+"_0": tf.train.Feature(bytes_list=tf.train.BytesList(value=indices0_str)),
-            self.key+"_v": tf.train.Feature(bytes_list=tf.train.BytesList(value=values_str))
+            self.key+"_0": tf.train.Feature(bytes_list=tf.train.BytesList(value=indices0_str)), # where's it zero.. just 1D support
+            # for 2D matrix indices1 should also be stored and while deserializing indices_1 should be also taken care of.
+            # For now it just uses zeros in indices_1 while deserializing. For 2D flatening and reshaping works for me.
+            self.key+"_v": tf.train.Feature(bytes_list=tf.train.BytesList(value=values_str)) # what's the value there
         }
         return features
 
