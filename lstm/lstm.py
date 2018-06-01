@@ -20,7 +20,9 @@ class LSTM_Classification(Network):
         self.lstm_hparam = HParams(name=lstm.get('name', 'lstm'),
                                    hidden_size=lstm.get('hidden_units', -1),
                                    num_layers=lstm.get('num_layers', -1),
-                                   dropout=1-lstm.get('dropout_keep', 0.7))
+                                   dropout=1-lstm.get('dropout_keep', 0.7),
+                                   bidirectional=lstm.get('type', 'unidirectional') == 'bidirectional'
+                                   )
         self.mlp_hparam = HParams(name=mlp.get('name', 'mlp'),
                                   layers=mlp.get('layer', []),
                                   activations=mlp.get('activation', []),
@@ -37,17 +39,27 @@ class LSTM_Classification(Network):
         mode = "cpu" if "cpu" in self.device else "gpu"
         with tf.device(self.device), tf.variable_scope(params.name, reuse=tf.AUTO_REUSE):
             if mode == "cpu":
-                cell = tf.contrib.rnn.LSTMBlockCell
-                cells_fw = [cell(params.hidden_size) for _ in range(params.num_layers)]
-                cells_bw = [cell(params.hidden_size) for _ in range(params.num_layers)]
-                if params.dropout > 0.0:
-                    cells_fw = [tf.contrib.rnn.DropoutWrapper(cell) for cell in cells_fw]
-                    cells_bw = [tf.contrib.rnn.DropoutWrapper(cell) for cell in cells_bw]
-                outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
-                    cells_fw=cells_fw,
-                    cells_bw=cells_bw,
-                    inputs=input,
-                    dtype=tf.float32)
+                def make_cell(hidden_size, num_layers, dropout):
+                    cell = tf.contrib.rnn.LSTMBlockCell
+                    # cell = tf.nn.rnn_cell.BasicLSTMCell
+                    cells_fw = [cell(hidden_size) for _ in range(num_layers)]
+                    if dropout > 0.0:
+                        cells_fw = [tf.contrib.rnn.DropoutWrapper(cell) for cell in cells_fw]
+                    return cells_fw
+
+                cells_fw = make_cell(params.hidden_size, params.num_layers, params.dropout)
+                if not params.bidirectional:
+                    cells_fw = tf.contrib.rnn.MultiRNNCell(cells_fw, state_is_tuple=True)
+                    outputs, _ = tf.nn.dynamic_rnn(cell=cells_fw,
+                                                   inputs=input,
+                                                   dtype=tf.float32)
+                else:
+                    cells_bw = make_cell(params.hidden_size, params.num_layers, params.dropout)
+                    outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
+                        cells_fw=cells_fw,
+                        cells_bw=cells_bw,
+                        inputs=input,
+                        dtype=tf.float32)
                 return outputs
             elif mode == "gpu":
                 t_input = tf.transpose(input, [1, 0, 2])
@@ -55,7 +67,7 @@ class LSTM_Classification(Network):
                     num_layers=params.num_layers,
                     num_units=params.hidden_size,
                     dropout=params.dropout,
-                    direction="bidirectional")
+                    direction="bidirectional" if params.bidirectional else "unidirectional")
                 outputs, _ = lstm(t_input)
                 # Convert back from time-major outputs to batch-major outputs.
                 outputs = tf.transpose(outputs, [1, 0, 2])

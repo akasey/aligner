@@ -6,6 +6,7 @@ model:
     hidden_units: 100
     num_layers: 3
     dropout_keep: 0.7
+    type: 'bidirectional' # 'bidirectional' or 'unidirectional'
   multilayer:
     name: 'multilayer'
     layer: [100,100]

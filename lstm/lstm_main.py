@@ -13,7 +13,7 @@ def sanity_check():
     assert os.path.exists(FLAGS.model_dir+"/hparam.yaml"), FLAGS.model_dir+"/hparam.yaml" + " not found"
 
 def main():
-    logger = make_logger("Main.AutoEncoder")
+    logger = make_logger("Main.LSTM")
     sanity_check()
     config = Config(FLAGS.model_dir+"/hparam.yaml")
     loader = LSTMClassificationLoader(FLAGS.data_dir, config.training.get('batch_size', 512))
