@@ -36,14 +36,21 @@ class LSTMClassificationWriter(Classification_Writer):
         self.mutation_prob = 0.2
         self.unknown_window_fraction = 0.2
 
+    def _to_time_series(self, window):
+        time_series = []
+        for start in range(0, len(window), self.strides):
+            if start+self.K < len(window):
+                time_series.append(window[start:start+self.K])
+        return time_series
+
 
     def _one_hot_input(self, window, reverse=False):
         window = ku.reverse_complement(window) if reverse else window
         # each kmer is a timestep in LSTM
-        totKmers = len(window) - self.K + 1
-        toRet = np.zeros((totKmers, 4 ** self.K))
-        rows = range(totKmers)
-        cols = [ku.encodeKmer(window[i:self.K + i]) for i in range(totKmers)]
+        time_series = self._to_time_series(window)
+        toRet = np.zeros((len(time_series), 4 ** self.K))
+        rows = range(len(time_series))
+        cols = [ku.encodeKmer(timestep) for timestep in time_series]
         toRet[rows,cols] = 1
         return toRet.reshape((-1))
 
