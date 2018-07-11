@@ -93,10 +93,11 @@ def analysis():
             # print(original_read, splits[0])
             predicted_read = PredictedRead.fromSplits(splits)
             # print(predicted_read, line)
-            if not predicted_read.read1_unmapped:
+            if not predicted_read.read1_unmapped or original_read.contig == "rand":
                 predicted_count += 1
-                if abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward:
-                    correct_prediction += 1
+            if predicted_read.read1_unmapped == original_read.read1_rand or \
+                    (abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward):
+                correct_prediction += 1
 
     print("correct", correct_prediction, "predicted_count", predicted_count, "total", total_data)
     recall = correct_prediction/total_data
