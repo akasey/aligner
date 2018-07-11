@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from autoencoder.encoder_writer import Kmer_Utility as ku
 from framework.common import make_logger
 from framework.serializer import Serializer
-from .fastamm import FastaMM
+from fastamm import FastaMM
 
 logging = make_logger("classification_loader.py")
 def logger(fn):
@@ -86,10 +86,10 @@ class Classification_Writer:
         self.output_shards = 5
         self.K = 7
         self.segment_length = 5000
-        self.window_length = 500
+        self.window_length = 200
         self.strides = self.K-1
-        self.mutation_freq = 5
-        self.mutation_prob = 0.2
+        self.mutation_freq = 1
+        self.mutation_prob = 0.05
         self.unknown_window_fraction = 0.2
 
         self.nucArr = ['A', 'C', 'G', 'T']
@@ -285,8 +285,8 @@ def write_main():
     writer.write()
 
 def main():
-    write_main()
-    # reader_main()
+    # write_main()
+    reader_main()
 
 
 if __name__=="__main__":
@@ -295,8 +295,8 @@ if __name__=="__main__":
     parser.add_argument(
         "--data_dir",
         type=str,
-        # default="sample_classification_run/",
-        default="Carsonella_ruddii/",
+        default="sample_classification_run/",
+        # default="Carsonella_ruddii/",
         help="Where is input data dir? use data_generation.py to create one")
 
     FLAGS, unparsed = parser.parse_known_args()

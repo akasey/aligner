@@ -26,7 +26,7 @@ class LSTMClassificationLoader(Classification_Loader):
 class LSTMClassificationWriter(Classification_Writer):
     def __init__(self, dirname):
         Classification_Writer.__init__(self, dirname)
-        self.strides = 1
+        self.strides = 2
         self.K = 4
 
         self.segment_length = 5000
@@ -79,9 +79,10 @@ def main():
         reader = LSTMClassificationLoader(FLAGS.data_dir, batch_size = 11)
         X,Y = reader.load_dataset("train")
         with tf.Session() as sess:
-            _x, _y = sess.run([X,Y])
-            print("x shape", _x.shape)
-            print("y shape", _y.shape)
+            for i in range(5):
+                _x, _y = sess.run([X,Y])
+                print("x shape", _x.shape)
+                print("y shape", _y.shape)
     elif FLAGS.mode == "write":
         writer = LSTMClassificationWriter(FLAGS.data_dir)
         writer.write()
@@ -98,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--mode",
         type=str,
-        default="read",
+        default="write",
         help="Modes: {write, read}"
     )
 
