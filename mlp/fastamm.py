@@ -1,4 +1,5 @@
 import math
+import re
 
 class FastaMM:
     def __init__(self, fasta, segmentLength, windowLen, K):
@@ -51,7 +52,11 @@ class FastaMM:
                 meta[len(meta)] = each
         return meta
 
-    def __makeSegments(self, genome, segmentLength, windowLen):
+    def ___makeSegments(self, genome, segmentLength, windowLen):
+        """
+        Divides the genome into segmentLength ± (windowLen/2).
+        Returns (start,end) of segments as list and total of those segments
+        """
         genomeLength = len(genome)
         numSegments = math.ceil(float(genomeLength) / float(segmentLength))
         segments = []
@@ -62,12 +67,33 @@ class FastaMM:
             segments.append(segment)
         return numSegments, segments
 
+    def __makeSegments(self, genome, segmentLength, windowLen):
+        """
+        Given one contig of genome, it splits the contig into contigs whenever there's a padding ("NNNN+") >= windowLen.
+        For each of those splitted contigs, it calls ___makeSegments to divide them into segments of length segmentLength ± (windowLen/2).
+        """
+        padding = "N"*windowLen + "+"
+        unpadded_segments = []
+        start = 0
+        for r in [(m.start(),m.end()) for m in re.finditer(padding, genome)]:
+            unpadded_segments.append((start, r[0]))
+            start = r[1]
+        unpadded_segments.append((start, len(genome)))
+
+        total_segments = 0
+        segments = []
+        for r_unpadded in unpadded_segments:
+            segment = genome[r_unpadded[0]:r_unpadded[1]]
+            n, this_segments = self.___makeSegments(segment, segmentLength, windowLen)
+            segments += [(start+r_unpadded[0], end+r_unpadded[0]) for (start,end) in this_segments]
+            total_segments += n
+        return total_segments, segments
 
 
 
 if __name__=="__main__":
-    m = FastaMM("sample_classification_run/sequence.fasta", 10000, 200)
+    m = FastaMM("sample_classification_run/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa", 10000, 200, 7)
     m.init()
-    for x in m.allClassificationJob():
-        print(x)
+    # for x in m.allClassificationJob():
+    #     print(x)
     m.writeMeta("sample_classification_run/")
