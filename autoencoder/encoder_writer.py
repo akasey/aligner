@@ -1,12 +1,14 @@
+import time
 import math
 import numpy as np
 from sklearn.model_selection import train_test_split
+from random import randint
 import tensorflow as tf
 
 workDir = "sample_autoencoder_run"
 WINDOW_LEN = 1000
 nucMap = {'A':0, 'C':1, 'G':2, 'T':3}
-revMap = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G'}
+revMap = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G', 'N':'N'}
 k=6
 
 kmerEncoding = {}
@@ -19,11 +21,13 @@ class Kmer_Utility:
 
     @staticmethod
     def encodeKmer(kmer):
+        kmer = kmer.upper()
         if kmer in kmerEncoding:
             return kmerEncoding[kmer]
         numeric = 0
         for idx, nt in enumerate(kmer):
-            numeric += nucMap[nt] * 4**idx
+            num_repr = randint(0,3) if nt not in nucMap else nucMap[nt]
+            numeric += num_repr * 4**idx
         kmerEncoding[kmer] = numeric
         return numeric
 
@@ -119,14 +123,17 @@ if __name__=="__main__":
     df = []
     meta = {}
     for window in windows:
-        encoding = Kmer_Utility.encodeKmerBagOfWords(window, last_window=last_window, last_encoded_window=last_encoded_window)
+        start_time = time.time()
+        encoding = Kmer_Utility.encodeKmerBagOfWords(window)
+        print("--- %s seconds ---" % (time.time() - start_time))
+        # encoding = Kmer_Utility.encodeKmerBagOfWords(window, last_window=last_window, last_encoded_window=last_encoded_window)
         last_window = window
         last_encoded_window = encoding
         row = makeRow(encoding)
         df.append(row)
         if len(meta) == 0:
             meta['input_shape'] = row['dense_shape']
-
+    exit(1)
     meta['total'] = len(df)
     print("Test train splits..")
     train, test = train_test_split(df, test_size=0.20)

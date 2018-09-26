@@ -65,7 +65,7 @@ class OriginalRead:
         read.contig = splits[9].strip()
         read.read1_start = int(splits[3])
         flags = int(splits[1])
-        read.read1_unmapped = flags & 4 > 0
+        read.read1_rand = flags & 4 > 0
         read.read1_forward = flags & 16 == 0
         return read
 
@@ -132,7 +132,7 @@ def analysis_with_real_in_sam():
             original_reads[splits[0].strip()] = original_read
 
     fin = open(FLAGS.sam, "r")
-    total_data, predicted_count, correct_prediction = 0,0,0
+    total_data, predicted_count, correct_prediction = 0.0,0.0,0.0
     for line in fin.readlines():
         if not line.startswith("@"):
             total_data += 1
@@ -141,7 +141,7 @@ def analysis_with_real_in_sam():
             # print(original_read, splits[0])
             predicted_read = PredictedRead.fromSplits(splits)
             # print(predicted_read, line)
-            if not predicted_read.read1_unmapped or original_read.contig == "rand":
+            if not predicted_read.read1_unmapped:
                 predicted_count += 1
             if predicted_read.read1_unmapped == original_read.read1_rand or \
                     (abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward):

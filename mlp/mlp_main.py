@@ -31,12 +31,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="sample_classification_run/",
+        default="sample_classification_run/longWindow",
         help="Where is input data dir? use data_generation.py to create one")
     parser.add_argument(
         "--model_dir",
         type=str,
-        default="sample_classification_run/model_dir/",
+        default="sample_classification_run/longWindow/model_dir/",
         help="Path for storing the model checkpoints.")
 
     FLAGS, unparsed = parser.parse_known_args()

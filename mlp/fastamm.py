@@ -1,5 +1,18 @@
 import math
 import re
+from framework.common import make_logger
+
+logging = make_logger("fastamm.py")
+def logger(fn):
+    from functools import wraps
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        logging.info('Running %s' % fn.__name__)
+        out = fn(*args, **kwargs)
+        logging.info('Completed running %s' % fn.__name__)
+        return out
+
+    return wrapper
 
 class FastaMM:
     def __init__(self, fasta, segmentLength, windowLen, K):
@@ -8,11 +21,12 @@ class FastaMM:
         self.windowLen = windowLen
         self.K = K
 
+    @logger
     def init(self):
         self.genomeDict = self._readGenome(self.fasta)
         self.table = self._segmentify(self.genomeDict)
 
-
+    @logger
     def allClassificationJob(self):
         for k,v in self.table.items():
             segment = self.genomeDict[v["name"]][  v["start"] : v["end"]  ]
@@ -28,6 +42,7 @@ class FastaMM:
             for k,v in self.table.items():
                 fout.write("%d$$$%s$$$%d$$$%d\n" % (k, v['name'], v['start'], v['end']))
 
+    @logger
     def _readGenome(self, fasta):
         dictionary = {}
         with open(fasta, "r") as fastafile:
@@ -39,6 +54,7 @@ class FastaMM:
                     dictionary[key] = dictionary[key] + line.strip()
         return dictionary
 
+    @logger
     def _segmentify(self, genomeDictionary):
         meta = {}
         for key,genome in genomeDictionary.items():
@@ -52,6 +68,7 @@ class FastaMM:
                 meta[len(meta)] = each
         return meta
 
+    @logger
     def ___makeSegments(self, genome, segmentLength, windowLen):
         """
         Divides the genome into segmentLength ± (windowLen/2).
@@ -67,6 +84,7 @@ class FastaMM:
             segments.append(segment)
         return numSegments, segments
 
+    @logger
     def __makeSegments(self, genome, segmentLength, windowLen):
         """
         Given one contig of genome, it splits the contig into contigs whenever there's a padding ("NNNN+") >= windowLen.
@@ -92,7 +110,7 @@ class FastaMM:
 
 
 if __name__=="__main__":
-    m = FastaMM("sample_classification_run/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa", 10000, 200, 7)
+    m = FastaMM("sample_classification_run/sequence.fasta", 5000, 200, 7)
     m.init()
     # for x in m.allClassificationJob():
     #     print(x)

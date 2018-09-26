@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import yaml
+import pyximport; pyximport.install()
 
 from sklearn.model_selection import train_test_split
 
@@ -88,16 +89,16 @@ class Classification_Writer:
         self.segment_length = 5000
         self.window_length = 200
         self.strides = self.K-1
-        self.mutation_freq = 1
+        self.mutation_freq = 10
         self.mutation_prob = 0.05
-        self.unknown_window_fraction = 0.2
+        self.unknown_window_fraction = 0.2 # 0.20 of original windows will be considered for unknown window class
 
         self.nucArr = ['A', 'C', 'G', 'T']
         self.meta = {}
 
     @logger
     def _read_windows_segments(self, fastamm):
-        allWindows = {}
+        allWindows = {} # window -> [segmentID]
         totalSegments = []
         for segID, segment in fastamm.allClassificationJob():
             totalSegments.append(segID)
@@ -113,6 +114,9 @@ class Classification_Writer:
 
     @logger
     def _add_unknown_windows(self, numSegments, allWindows):
+        """
+        Add the windows for unknown segments class
+        """
         known_samples = []
         mutations = {}
         for window, segIds in allWindows.items():
@@ -235,6 +239,8 @@ class Classification_Writer:
     @logger
     def write_tf(self, df, allWindows, numSegments, filename):
         with tf.python_io.TFRecordWriter(filename) as writer:
+            total = len(df)
+            counter = 0
             for window in df:
                 input = self._one_hot_input(window, reverse=False)
                 output = self._one_hot_output(allWindows[window], numSegments)
@@ -244,6 +250,9 @@ class Classification_Writer:
                 input2 = self._one_hot_input(window, reverse=True)
                 serializable_features = self.serialization.make_serializable(input=input2, output=output)
                 writer.write(serializable_features)
+                counter += 1
+                if counter % 10000 == 0:
+                    logging.info('Progress %d/%d' % (counter, total) )
 
 
     @logger
@@ -273,6 +282,11 @@ class Classification_Writer:
 
 
 def reader_main():
+    try:
+        sess = tf.Session()
+        sess.close()
+    except:
+        pass
     loader = Classification_Loader(FLAGS.data_dir, 1)
     features, labels = loader.load_dataset("test")
     with tf.Session() as sess:
@@ -285,8 +299,8 @@ def write_main():
     writer.write()
 
 def main():
-    # write_main()
-    reader_main()
+    write_main()
+    # reader_main()
 
 
 if __name__=="__main__":
@@ -300,10 +314,7 @@ if __name__=="__main__":
         help="Where is input data dir? use data_generation.py to create one")
 
     FLAGS, unparsed = parser.parse_known_args()
-    try:
-        sess = tf.Session()
-    except:
-        pass
+
     main()
 
 
