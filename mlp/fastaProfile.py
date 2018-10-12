@@ -24,8 +24,9 @@ if __name__ == "__main__":
                 cigar = fields[5]
                 read = fields[9]
                 error_count = count_errors(cigar)
-                error_percentage.append(error_count/len(read))
-                read_length.append(len(read))
+                if read != "*":
+                    error_percentage.append(error_count/len(read))
+                    read_length.append(len(read))
                 # print(error_count, cigar, read)
 
     read_length = np.array(read_length)

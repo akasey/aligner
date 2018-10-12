@@ -7,6 +7,7 @@ import yaml
 import pyximport; pyximport.install()
 
 from sklearn.model_selection import train_test_split
+import concurrent.futures as futures
 
 from autoencoder.encoder_writer import Kmer_Utility as ku
 from framework.common import make_logger
@@ -30,6 +31,7 @@ class Classification_Loader:
         self.directory = dirname
         self.batch_size = batch_size
         self.meta = self._load_meta(self.directory)
+        self.enable_compression = self.meta.get("compression", "false") == "true"
         self.serialization = Serializer(self.directory+"/serialization-meta.npy")
         self.training_dataset = None
         self.test_dataset = None
@@ -51,7 +53,10 @@ class Classification_Loader:
         return None
 
     def _deserialize_file(self, filename, parallelism=4):
-        return tf.data.TFRecordDataset(filename).map(self.serialization.deserialize, num_parallel_calls=parallelism)
+        if not self.enable_compression:
+            return tf.data.TFRecordDataset(filename).map(self.serialization.deserialize, num_parallel_calls=parallelism)
+        else:
+            return tf.data.TFRecordDataset(filename, compression_type='GZIP').map(self.serialization.deserialize, num_parallel_calls=parallelism)
 
     def _separate(self, dictionary):
         X,Y = dictionary['input'], dictionary['output']
@@ -236,23 +241,50 @@ class Classification_Writer:
     def _create_serializer(self):
         self.serialization = Serializer({'input': 'sparse', 'output': 'sparse'})
 
+    def __make_tf_record_writer(self, output_filename):
+        options = None
+        if self.enable_compression:
+            options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
+            self._register_meta("compression", "true")
+        return tf.python_io.TFRecordWriter(output_filename, options=options)
+
     @logger
     def write_tf(self, df, allWindows, numSegments, filename):
-        with tf.python_io.TFRecordWriter(filename) as writer:
+        with self.__make_tf_record_writer(filename) as writer:
             total = len(df)
-            counter = 0
-            for window in df:
+            pool = futures.ThreadPoolExecutor(FLAGS.threads)
+            def task_for_each_window(window):
                 input = self._one_hot_input(window, reverse=False)
                 output = self._one_hot_output(allWindows[window], numSegments)
-                serializable_features = self.serialization.make_serializable(input=input, output=output)
-                writer.write(serializable_features)
+                serializable_features_forward = self.serialization.make_serializable(input=input, output=output)
+                # writer.write(serializable_features_forward)
+
                 # Reverse window
                 input2 = self._one_hot_input(window, reverse=True)
-                serializable_features = self.serialization.make_serializable(input=input2, output=output)
-                writer.write(serializable_features)
-                counter += 1
-                if counter % 10000 == 0:
-                    logging.info('Progress %d/%d' % (counter, total) )
+                serializable_features_reverse = self.serialization.make_serializable(input=input2, output=output)
+                # writer.write(serializable_features_reverse)
+                return serializable_features_forward, serializable_features_reverse
+
+
+            data_pointer = 0
+            while data_pointer < len(df):
+                tasks_future = []
+                for i in range(FLAGS.threads):
+                    if data_pointer < len(df):
+                        window = df[data_pointer]
+                        data_pointer += 1
+                        future_task = pool.submit(task_for_each_window, (window))
+                        tasks_future.append(future_task)
+
+                futures.wait(tasks_future)
+
+                for promise in tasks_future:
+                    forward_serializable, reverse_serializable = promise.result()
+                    writer.write(forward_serializable)
+                    writer.write(reverse_serializable)
+
+                if data_pointer % 10000 == 0:
+                    logging.info('Progress %d/%d' % (data_pointer, total) )
 
 
     @logger
@@ -263,6 +295,7 @@ class Classification_Writer:
         return fastamm
 
     def write(self):
+        self.enable_compression = True
         self.logger.info("Initiating...")
         fastamm = self.create_fasta_mlp_minhash_interface()
         numSegments, allWindows = self._read_windows_segments(fastamm)
@@ -312,6 +345,12 @@ if __name__=="__main__":
         default="sample_classification_run/",
         # default="Carsonella_ruddii/",
         help="Where is input data dir? use data_generation.py to create one")
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=5,
+        # default="Carsonella_ruddii/",
+        help="Number of threads while writing dataframe")
 
     FLAGS, unparsed = parser.parse_known_args()
 

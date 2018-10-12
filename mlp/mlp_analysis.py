@@ -59,6 +59,20 @@ class OriginalRead:
         return read
 
     @staticmethod
+    def fromNanoSim(sam_col1):
+        splits = sam_col1.split("_")
+        splits = list(reversed(splits))
+        read = OriginalRead()
+        read.contig = "_".join(reversed(splits[7:]))
+        read.read1_start = int(splits[6])
+        read.read2_start = -1
+        read.read1_forward = (splits[3] == "F")
+        read.read2_forward = False
+        read.read1_rand = splits[5] != "aligned"
+        read.read2_rand = False
+        return read
+
+    @staticmethod
     def fromSamRow(samLine):
         splits = samLine.strip().split("\t")
         read = OriginalRead()
@@ -99,21 +113,22 @@ class PredictedRead:
         return "%s r1:(start: %d forward: %r unmapped: %r)" % (self.contig, self.read1_start, self.read1_forward, self.read1_unmapped)
 
 
-def analysis_with_real_in_seqname():
+def analysis_with_real_in_seqname_old(original_read_parser):
     fin = open(FLAGS.sam, "r")
-    total_data, predicted_count, correct_prediction = 0,0,0
+    total_data, predicted_count, correct_prediction = 0.0,0.0,0.0
+    predicted_keys, correctly_predicted_keys = {}, {}
     for line in fin.readlines():
         if not line.startswith("@"):
             total_data += 1
             splits = line.strip().split("\t")
-            original_read = OriginalRead.fromString(splits[0])
+            original_read = original_read_parser(splits[0])
             # print(original_read, splits[0])
             predicted_read = PredictedRead.fromSplits(splits)
             # print(predicted_read, line)
-            if not predicted_read.read1_unmapped or original_read.contig == "rand":
+            if (predicted_read.read1_unmapped and original_read.read1_rand) or not predicted_read.read1_unmapped:
                 predicted_count += 1
-            if predicted_read.read1_unmapped == original_read.read1_rand or \
-                    (abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward):
+            if (predicted_read.read1_unmapped and original_read.read1_rand) or \
+                    (not predicted_read.read1_unmapped and abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward):
                 correct_prediction += 1
 
     print("correct", correct_prediction, "predicted_count", predicted_count, "total", total_data)
@@ -121,8 +136,7 @@ def analysis_with_real_in_seqname():
     precision = correct_prediction/predicted_count
     print("Recall", recall, "precision", precision, "sensitivity", predicted_count/total_data, "F1", 2*recall*precision/(recall+precision))
 
-
-def analysis_with_real_in_sam():
+def analysis_with_real_in_sam_old():
     foriginal = open(FLAGS.realSam, "r")
     original_reads = dict()
     for line in foriginal.readlines():
@@ -141,7 +155,7 @@ def analysis_with_real_in_sam():
             # print(original_read, splits[0])
             predicted_read = PredictedRead.fromSplits(splits)
             # print(predicted_read, line)
-            if not predicted_read.read1_unmapped:
+            if (predicted_read.read1_unmapped == original_read.read1_rand) or not predicted_read.read1_unmapped:
                 predicted_count += 1
             if predicted_read.read1_unmapped == original_read.read1_rand or \
                     (abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward):
@@ -151,6 +165,64 @@ def analysis_with_real_in_sam():
     recall = correct_prediction/total_data
     precision = correct_prediction/predicted_count
     print("Recall", recall, "precision", precision, "sensitivity", predicted_count/total_data, "F1", 2*recall*precision/(recall+precision))
+
+
+def precision_recall(true_reads_dict, predicted_sam_file):
+    fin = open(predicted_sam_file, "r")
+    predicted_keys, correctly_predicted_keys, all_keys = {}, {}, {}
+    for line in fin.readlines():
+        if not line.startswith("@"):
+            splits = line.strip().split("\t")
+            key = splits[0].strip()
+            predicted_read = PredictedRead.fromSplits(splits)
+            original_read = true_reads_dict[key]
+            if key not in all_keys:
+                all_keys[key] = 1
+            x = 0
+            if (key not in predicted_keys) and \
+                ( (predicted_read.read1_unmapped and original_read.read1_rand) or not predicted_read.read1_unmapped ):
+                predicted_keys[key] = 1
+                x+=1
+            if (key not in correctly_predicted_keys) and \
+                    ( \
+                        (predicted_read.read1_unmapped and original_read.read1_rand) or \
+                        (not predicted_read.read1_unmapped and \
+                         abs(predicted_read.read1_start - original_read.read1_start) <= FLAGS.threshold and predicted_read.read1_forward == original_read.read1_forward) \
+                    ):
+                correctly_predicted_keys[key] = 1
+                x+=1
+            x = 0
+
+    print("correct", len(correctly_predicted_keys), "predicted", len(predicted_keys), "total", len(all_keys))
+    recall = 1.0 * len(correctly_predicted_keys) / len(all_keys)
+    precision = 1.0 * len(correctly_predicted_keys) / len(predicted_keys)
+    sensitivity = 1.0 * len(predicted_keys) / len(all_keys)
+    f1 = 2.0 * recall * precision / (recall + precision)
+    print("Recall", recall, "Precision", "precision", precision, "Sensitivity", sensitivity, "F1", f1)
+
+
+def analysis_with_real_in_seqname(original_read_parser):
+    fin = open(FLAGS.sam, "r")
+    true_reads_dict = {}
+    for line in fin.readlines():
+        if not line.startswith("@"):
+            splits = line.strip().split("\t")
+            key = splits[0].strip()
+            if key not in true_reads_dict:
+                original_read = original_read_parser(splits[0])
+                true_reads_dict[key] = original_read
+    precision_recall(true_reads_dict, FLAGS.sam)
+
+def analysis_with_real_in_sam():
+    foriginal = open(FLAGS.realSam, "r")
+    original_reads = dict()
+    for line in foriginal.readlines():
+        if not line.startswith("@"):
+            splits = line.strip().split("\t")
+            original_read = OriginalRead.fromSamRow(line.strip())
+            original_reads[splits[0].strip()] = original_read
+    precision_recall(original_reads, FLAGS.sam)
+
 
 
 if __name__=="__main__":
@@ -169,8 +241,8 @@ if __name__=="__main__":
     parser.add_argument(
         "--mode",
         type=int,
-        default=1,
-        help="Mode 1: Real in SEQ NAME, Mode 2: Real in SAM")
+        default=2,
+        help="Mode 1: Real in SEQ NAME(dwgsim), Mode 2: Real in SAM, Mode 3:Real in SEQ(nanosim)")
     parser.add_argument(
         "--threshold",
         type=float,
@@ -179,7 +251,16 @@ if __name__=="__main__":
 
     FLAGS, unparsed = parser.parse_known_args()
 
+
+    def illumina_original_parser(firstColumn):
+        return OriginalRead.fromString(firstColumn)
+
+    def nanopore_original_parser(firstColumn):
+        return OriginalRead.fromNanoSim(firstColumn)
+
     if FLAGS.mode == 1:
-        analysis_with_real_in_seqname()
+        analysis_with_real_in_seqname(illumina_original_parser)
     elif FLAGS.mode == 2:
         analysis_with_real_in_sam()
+    elif FLAGS.mode == 3:
+        analysis_with_real_in_seqname(nanopore_original_parser)
