@@ -3,6 +3,7 @@ import re
 import math
 
 
+"""
 def main():
     fin = open(FLAGS.data_dir +"/predictedLocations", "r")
     total_data = 0
@@ -33,6 +34,7 @@ def main():
     recall = correct_prediction/total_data
     precision = correct_prediction/predicted_count
     print("Recall", recall, "precision", precision, "sensitivity", predicted_count/total_data, "F1", 2*recall*precision/(recall+precision))
+"""
 
 class OriginalRead:
     def __init__(self):
@@ -113,6 +115,7 @@ class PredictedRead:
         return "%s r1:(start: %d forward: %r unmapped: %r)" % (self.contig, self.read1_start, self.read1_forward, self.read1_unmapped)
 
 
+"""
 def analysis_with_real_in_seqname_old(original_read_parser):
     fin = open(FLAGS.sam, "r")
     total_data, predicted_count, correct_prediction = 0.0,0.0,0.0
@@ -165,6 +168,7 @@ def analysis_with_real_in_sam_old():
     recall = correct_prediction/total_data
     precision = correct_prediction/predicted_count
     print("Recall", recall, "precision", precision, "sensitivity", predicted_count/total_data, "F1", 2*recall*precision/(recall+precision))
+"""
 
 
 def precision_recall(true_reads_dict, predicted_sam_file):
@@ -178,7 +182,7 @@ def precision_recall(true_reads_dict, predicted_sam_file):
             original_read = true_reads_dict[key]
             if key not in all_keys:
                 all_keys[key] = 1
-            x = 0
+            x = 10
             if (key not in predicted_keys) and \
                 ( (predicted_read.read1_unmapped and original_read.read1_rand) or not predicted_read.read1_unmapped ):
                 predicted_keys[key] = 1
@@ -194,11 +198,11 @@ def precision_recall(true_reads_dict, predicted_sam_file):
             x = 0
 
     print("correct", len(correctly_predicted_keys), "predicted", len(predicted_keys), "total", len(all_keys))
-    recall = 1.0 * len(correctly_predicted_keys) / len(all_keys)
-    precision = 1.0 * len(correctly_predicted_keys) / len(predicted_keys)
-    sensitivity = 1.0 * len(predicted_keys) / len(all_keys)
+    recall = 1.0 * len(correctly_predicted_keys) / len(all_keys) if len(all_keys) !=0 else 0.000000000001
+    precision = 1.0 * len(correctly_predicted_keys) / len(predicted_keys) if len(predicted_keys) !=0 else 0.0000000001
+    sensitivity = 1.0 * len(predicted_keys) / len(all_keys) if len(all_keys) !=0 else 0.000
     f1 = 2.0 * recall * precision / (recall + precision)
-    print("Recall", recall, "Precision", "precision", precision, "Sensitivity", sensitivity, "F1", f1)
+    print("Recall", recall, "Precision", precision, "Sensitivity", sensitivity, "F1", f1)
 
 
 def analysis_with_real_in_seqname(original_read_parser):
@@ -241,7 +245,7 @@ if __name__=="__main__":
     parser.add_argument(
         "--mode",
         type=int,
-        default=2,
+        default=1,
         help="Mode 1: Real in SEQ NAME(dwgsim), Mode 2: Real in SAM, Mode 3:Real in SEQ(nanosim)")
     parser.add_argument(
         "--threshold",

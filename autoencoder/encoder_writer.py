@@ -44,8 +44,10 @@ class Kmer_Utility:
     def slidingWindow(segment, winlength, strides=1):
         windows = []
         starting_points = [start for start in range(0,len(segment)-winlength, strides)]
-        if starting_points[-1] + winlength < len(segment):
+        if len(starting_points)>0 and starting_points[-1] + winlength < len(segment):
             starting_points.append(len(segment)-winlength)
+        else:
+            starting_points.append(0)
         for start in starting_points:
             window = segment[start:start+winlength]
             windows.append(window)
