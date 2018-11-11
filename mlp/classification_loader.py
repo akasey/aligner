@@ -12,7 +12,7 @@ import concurrent.futures as futures
 from autoencoder.encoder_writer import Kmer_Utility as ku
 from framework.common import make_logger
 from framework.serializer import Serializer
-from fastamm import FastaMM
+from framework.fastamm import FastaMM
 
 logging = make_logger("classification_loader.py")
 def logger(fn):

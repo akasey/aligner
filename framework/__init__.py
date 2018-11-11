@@ -1,1 +1,1 @@
-__all__ = ["common", "config", "trainer", "network"]
+__all__ = ["common", "config", "trainer", "network", "fastamm"]
