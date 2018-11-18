@@ -69,6 +69,7 @@ class LSTMClassificationWriter(Classification_Writer):
                 writer.write(serializable_features)
 
     def write(self):
+        self.enable_compression = True
         self._register_meta('window_length', self.window_length)
         self._register_meta('K', self.K)
         Classification_Writer.write(self)

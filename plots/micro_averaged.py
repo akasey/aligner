@@ -77,12 +77,28 @@ def micro_average(Y_true, Y_pred):
 
     logger.info("Micro-averaged:: Precision: %f, Recall: %f" %(YZ/Z, YZ/Y))
 
+def example_based(Y_true, Y_pred):
+    precision, recall, accuracy = 0.0,0.0,0.0
+    precisionCount, recallCount, accuracyCount = 0.0,0.0,0.0
+    for i in range(Y_true.shape[0]):
+        if np.sum(Y_pred[i]) > 0:
+            precision += np.sum(Y_true[i]*Y_pred[i]) / np.sum(Y_pred[i])
+            precisionCount += 1
+
+        recall += np.sum(Y_true[i] * Y_pred[i]) / np.sum(Y_true[i])
+        recallCount += 1
+
+        accuracy += np.sum(Y_true[i] * Y_pred[i]) / len(np.argwhere(Y_true[i]+Y_pred[i]))
+        accuracyCount += 1
+
+    logger.info("Example-based: Precision: %f, Recall: %f, Accuracy: %f" % (precision/precisionCount, recall/recallCount, accuracy/accuracyCount))
 
 def main():
     Y_true, Y_pred = make_predictions()
     Y_true, Y_pred = np.array(Y_true), np.array(Y_pred)
     logger.info("Test size: %d, NumClasses: %d" % (Y_true.shape[0], Y_true.shape[1]))
     micro_average(Y_true, Y_pred)
+    example_based(Y_true, Y_pred)
 
 
 if __name__ == "__main__":
